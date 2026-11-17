@@ -1,0 +1,72 @@
+@import "tailwindcss";
+
+/*
+ * Design tokens. Values mirror lib/design/tokens.ts (kept in sync by a unit test).
+ * Tailwind's default palette is removed so only brand colours exist.
+ */
+@theme {
+  --color-*: initial;
+  --color-ink: #1F2A37;
+  --color-sand: #F6EFE4;
+  --color-white: #FFFFFF;
+  --color-emerald: #0A7550;
+  --color-berry: #B5305C;
+  --color-pink: #F0668A;
+  --color-sunshine: #F6B93B;
+  --color-sky: #8CC6EE;
+  --color-transparent: transparent;
+  --color-current: currentColor;
+
+  /* One family token; swap to Noto Sans here [CONFIRM]. */
+  --font-sans: var(--font-brand), system-ui, sans-serif;
+
+  --radius-card: 1rem;
+  --radius-control: 0.75rem;
+  --spacing-tap: 2.75rem; /* 44px minimum tap target */
+}
+
+:root {
+  color-scheme: light;
+}
+
+html {
+  /* rem-based so text follows the device text-size setting */
+  font-size: 100%;
+}
+
+body {
+  background: var(--color-sand);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  font-size: 1rem;
+  line-height: 1.5;
+}
+
+/* Visible focus, always. */
+:focus-visible {
+  outline: 3px solid var(--color-ink);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Links inside body text are underlined. */
+.prose-link,
+p a,
+li a {
+  text-decoration: underline;
+  text-underline-offset: 0.15em;
+}
+
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "name": "Majlis Club",
+  "short_name": "Majlis Club",
+  "description": "Find your child's club, close to home.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#F6EFE4",
+  "theme_color": "#F6EFE4",
+  "icons": [{ "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml" }]
+}

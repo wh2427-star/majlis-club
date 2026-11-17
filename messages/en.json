@@ -1,0 +1,38 @@
+{
+  "meta": {
+    "strapline": "Find your child's club, close to home.",
+    "description": "A free directory of kids' sports clubs in Dubai, with the facts first."
+  },
+  "common": {
+    "demoBanner": "Demo data. Every club, person and number here is made up.",
+    "skipToContent": "Skip to content",
+    "placeholderArt": "Placeholder illustration",
+    "loading": "Loading"
+  },
+  "styleguide": {
+    "title": "Design system",
+    "intro": "Tokens and components. Placeholder logo and illustrations are marked as such.",
+    "colours": "Colours",
+    "buttons": "Buttons",
+    "badges": "Badges",
+    "forms": "Forms",
+    "logo": "Logo (placeholder concept)",
+    "illustrations": "Illustrations (placeholders)",
+    "numbers": "Numbers",
+    "primary": "Send enquiry",
+    "secondary": "Save club",
+    "quiet": "See all clubs",
+    "danger": "Reject",
+    "licence": "Licence verified",
+    "trial": "Trial session",
+    "featured": "Featured",
+    "fieldLabel": "Child's nickname",
+    "fieldHint": "A nickname is enough. We do not ask for full names.",
+    "fieldError": "Enter a nickname.",
+    "checkbox": "I confirm the club holds parental consent for this photo.",
+    "views": "profile views",
+    "enquiries": "enquiries",
+    "noticeInfo": "Live in Arabian Ranches, the Meadows and the Springs.",
+    "illustrationAlt": "Placeholder drawing of a child playing {sport}"
+  }
+}
