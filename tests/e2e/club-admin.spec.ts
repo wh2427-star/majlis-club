@@ -122,3 +122,17 @@ test("non-admins cannot open admin screens", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "We could not find that page." })).toBeVisible();
   await expect(page.getByText("Licence checks")).toHaveCount(0);
 });
+
+test("a large licence document uploads straight to storage, not through the app server", async ({ page }) => {
+  // 7 MB is above the server's 1 MB action limit and hosts' request caps, so this only works via direct upload.
+  await signIn(page, "club");
+  const base = await clubBase(page, "Oryx Owls Football");
+  await page.goto(`${base}/licence`);
+  await page.getByLabel("Licence number").fill("E2E-12345");
+  await page.getByLabel("Issuing authority").fill("Demo authority");
+  await page.getByLabel("Expiry date").fill("2030-01-31");
+  const pdf = Buffer.concat([Buffer.from("%PDF-1.4\n"), Buffer.alloc(7 * 1024 * 1024, 0x20)]);
+  await page.getByLabel("Licence document").setInputFiles({ name: "licence.pdf", mimeType: "application/pdf", buffer: pdf });
+  await page.getByRole("button", { name: "Send licence" }).click();
+  await expect(page.getByText("Licence sent. We will check it and email you.")).toBeVisible({ timeout: 30_000 });
+});

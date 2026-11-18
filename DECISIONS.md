@@ -41,5 +41,6 @@ Items marked **[CONFIRM]** are deliberately not resolved in code.
 - **Seed** is a TypeScript script (`npm run seed`) rather than `seed.sql`, because it also creates auth users and uploads placeholder images. Club "photos" are drawings of pitches and pools, never people.
 - **E2E tests reset the demo data** (global setup runs the seed) so runs are repeatable. Point them only at a dev project.
 - **Admin access** is a `profiles.role = 'admin'` row, set by the seed or SQL; nobody can promote themselves (trigger + RLS test).
-- **Server actions accept up to 11 MB** for photo (5 MB) and licence (10 MB) uploads.
+- **Uploads go straight from the browser to Supabase Storage** (photos 5 MB, licences 10 MB), then a server action checks the stored path belongs to the club and records it. Hosts cap request bodies (Netlify ~6 MB, Vercel ~4.5 MB), so files never pass through the app server. Rules live in `lib/domain/uploads.ts`.
+- **Hosting.** Netlify, deploying from the private GitHub repo `wh2427-star/majlis-club`.
 - **Forms keep typed values** after a validation error (React resets forms after a form action by default).

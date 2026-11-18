@@ -10,6 +10,8 @@ import { PhotoGallery } from "@/components/club/PhotoGallery";
 import { captionNameWarning } from "@/lib/domain/rules";
 import type { ClubPhoto } from "@/lib/data/queries";
 import type { ActionState } from "@/lib/services/public-actions";
+import { licenceSchema, photoSchema } from "@/lib/schemas";
+import { withDirectUpload } from "./directUpload";
 import { FormError, useFieldError, useFormAction } from "./PublicForms";
 
 type Opt = { value: string; label: string };
@@ -195,9 +197,12 @@ export function ListingEditor({
   );
 }
 
+const uploadPhoto = withDirectUpload("photo", "file", photoSchema, uploadPhotoAction);
+const submitLicence = withDirectUpload("licence", "document", licenceSchema, submitLicenceAction);
+
 export function PhotoUploadForm({ clubId, clubName }: { clubId: string; clubName: string }) {
   const t = useTranslations("photos");
-  const { state, pending, formProps } = useFormAction(uploadPhotoAction);
+  const { state, pending, formProps } = useFormAction(uploadPhoto);
   const err = useFieldError(state);
   const [caption, setCaption] = useState("");
   const flagged = captionNameWarning(caption, [clubName]);
@@ -221,7 +226,7 @@ export function PhotoUploadForm({ clubId, clubName }: { clubId: string; clubName
 
 export function LicenceForm({ clubId }: { clubId: string }) {
   const t = useTranslations("licence");
-  const { state, pending, formProps } = useFormAction(submitLicenceAction);
+  const { state, pending, formProps } = useFormAction(submitLicence);
   const err = useFieldError(state);
   if (state.ok) return <SuccessNotice state={state} />;
   return (

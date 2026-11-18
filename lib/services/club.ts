@@ -6,11 +6,17 @@ import { getClubById, getCurrentUser, getMyClubs } from "@/lib/data/queries";
 import { clubListingSchema, fieldErrors, licenceSchema, photoSchema, sessionSchema } from "@/lib/schemas";
 import { licenceState, shouldShowUpgradePrompt } from "@/lib/domain/rules";
 import { appConfig } from "@/config/app";
+import { isValidUploadPath, uploadRules, type UploadKind } from "@/lib/domain/uploads";
 import { requireUser } from "./family";
 import type { ActionState } from "./public-actions";
 
-const PHOTO_TYPES: Record<string, string> = { "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp" };
-const LICENCE_TYPES: Record<string, string> = { "application/pdf": "pdf", "image/jpeg": "jpg", "image/png": "png" };
+/** The browser uploads the file to storage first; check the path belongs to this club and the object exists. */
+async function checkStoredUpload(kind: UploadKind, clubId: string, path: string) {
+  if (!isValidUploadPath(kind, clubId, path)) return false;
+  const db = await createClient();
+  const { data } = await db.storage.from(uploadRules[kind].bucket).exists(path);
+  return data === true;
+}
 
 /** The signed-in user must manage this club (or be an admin). */
 export async function requireClubAccess(clubId: string, next: string) {
@@ -162,14 +168,9 @@ export async function uploadPhoto(form: FormData): Promise<ActionState> {
   });
   if (!parsed.success) return { ok: false, errors: fieldErrors(parsed.error) };
   const { user } = await requireClubAccess(parsed.data.clubId, `/club/${parsed.data.clubId}/photos`);
-  const file = form.get("file");
-  if (!(file instanceof File) || file.size === 0) return { ok: false, errors: { file: "errors.file" } };
-  const ext = PHOTO_TYPES[file.type];
-  if (!ext || file.size > 5 * 1024 * 1024) return { ok: false, errors: { file: "errors.fileType" } };
+  const path = String(form.get("path") ?? "");
+  if (!(await checkStoredUpload("photo", parsed.data.clubId, path))) return { ok: false, errors: { file: "errors.file" } };
   const db = await createClient();
-  const path = `${parsed.data.clubId}/${randomUUID()}.${ext}`;
-  const up = await db.storage.from("club-photos").upload(path, file, { contentType: file.type });
-  if (up.error) return { ok: false, message: "errors.generic" };
   const { error } = await db.from("club_photos").insert({
     club_id: parsed.data.clubId,
     storage_path: path,
@@ -178,10 +179,7 @@ export async function uploadPhoto(form: FormData): Promise<ActionState> {
     consent_confirmed_at: new Date().toISOString(),
     uploaded_by: user.id,
   });
-  if (error) {
-    await db.storage.from("club-photos").remove([path]);
-    return { ok: false, message: "errors.generic" };
-  }
+  if (error) return { ok: false, message: "errors.generic" };
   return { ok: true, message: "photos.uploaded" };
 }
 
@@ -203,14 +201,9 @@ export async function submitLicence(form: FormData): Promise<ActionState> {
   });
   if (!parsed.success) return { ok: false, errors: fieldErrors(parsed.error) };
   await requireClubAccess(parsed.data.clubId, `/club/${parsed.data.clubId}/licence`);
-  const file = form.get("document");
-  if (!(file instanceof File) || file.size === 0) return { ok: false, errors: { document: "errors.file" } };
-  const ext = LICENCE_TYPES[file.type];
-  if (!ext || file.size > 10 * 1024 * 1024) return { ok: false, errors: { document: "errors.fileType" } };
+  const path = String(form.get("path") ?? "");
+  if (!(await checkStoredUpload("licence", parsed.data.clubId, path))) return { ok: false, errors: { document: "errors.file" } };
   const db = await createClient();
-  const path = `${parsed.data.clubId}/${randomUUID()}.${ext}`;
-  const up = await db.storage.from("licences").upload(path, file, { contentType: file.type });
-  if (up.error) return { ok: false, message: "errors.generic" };
   const { error } = await db.from("licences").insert({
     club_id: parsed.data.clubId,
     number: parsed.data.number,
