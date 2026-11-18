@@ -70,3 +70,17 @@ li a {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* Dots-divide: split (7 → 28), form the sport, gather into the doorway. Forwards only, once. */
+@keyframes dots-divide {
+  0% { transform: translate(var(--x0), var(--y0)) scale(1); }
+  20% { transform: translate(var(--x1), var(--y1)) scale(0.5); }
+  45%, 70% { transform: translate(var(--x2), var(--y2)) scale(0.45); }
+  100% { transform: translate(var(--x0), var(--y0)) scale(1); }
+}
+.dots-divide.is-playing circle {
+  animation: dots-divide 2.4s ease-in-out 1 both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .dots-divide circle { animation: none !important; }
+}

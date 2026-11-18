@@ -20,7 +20,7 @@ export function ClubFacts({
   const t = useTranslations();
   const rows: [string, string, string][] = [
     ["sport", t("facts.sport"), sportsText(t, sessions, sports)],
-    ["ages", t("facts.agesLabel"), agesText(t, sessions) || t("facts.noSessions")],
+    ["ages", t("facts.agesLabel"), agesText(t, sessions, true) || t("facts.noSessions")],
     ["days", t("facts.daysLabel"), daysAndTimes(t, sessions)],
     ["area", t("facts.areaLabel"), areaName],
     ["price", t("facts.priceLabel"), priceText(t, sessions) || "–"],

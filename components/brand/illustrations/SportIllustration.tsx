@@ -58,7 +58,14 @@ const objects: Record<string, React.ReactNode> = {
 
 export function SportIllustration({ sport, alt, className = "" }: Props) {
   return (
-    <svg viewBox="0 0 200 140" role="img" aria-label={alt} className={className} data-placeholder="illustration">
+    <svg
+      viewBox="0 0 200 140"
+      role={alt ? "img" : undefined}
+      aria-label={alt || undefined}
+      aria-hidden={alt ? undefined : true}
+      className={className}
+      data-placeholder="illustration"
+    >
       <rect width="200" height="140" fill={colours.sand} />
       <circle cx="40" cy="36" r="22" fill={pink} />
       <rect x="0" y="126" width="200" height="14" fill={emerald} />

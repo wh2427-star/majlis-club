@@ -40,10 +40,29 @@
     "martial-arts": "Martial arts"
   },
   "days": {
-    "short": { "0": "Mon", "1": "Tue", "2": "Wed", "3": "Thu", "4": "Fri", "5": "Sat", "6": "Sun" },
-    "long": { "0": "Monday", "1": "Tuesday", "2": "Wednesday", "3": "Thursday", "4": "Friday", "5": "Saturday", "6": "Sunday" }
+    "short": {
+      "0": "Mon",
+      "1": "Tue",
+      "2": "Wed",
+      "3": "Thu",
+      "4": "Fri",
+      "5": "Sat",
+      "6": "Sun"
+    },
+    "long": {
+      "0": "Monday",
+      "1": "Tuesday",
+      "2": "Wednesday",
+      "3": "Thursday",
+      "4": "Friday",
+      "5": "Saturday",
+      "6": "Sunday"
+    }
   },
-  "clubType": { "academy": "Academy", "community": "Community club" },
+  "clubType": {
+    "academy": "Academy",
+    "community": "Community club"
+  },
   "facts": {
     "ages": "Ages {min} to {max}",
     "price": "AED {price} a session",
@@ -60,7 +79,8 @@
     "sessionRow": "{day}, {start} to {end}",
     "licenceVerified": "Licence verified",
     "trialSession": "Trial session",
-    "featured": "Featured"
+    "featured": "Featured",
+    "ageRange": "{min} to {max}"
   },
   "home": {
     "title": "Find your child's club, close to home.",

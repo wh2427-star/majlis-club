@@ -28,9 +28,9 @@ export function daysAndTimes(t: T, sessions: Session[]): string {
     .join(" · ");
 }
 
-export function agesText(t: T, sessions: Session[]): string {
+export function agesText(t: T, sessions: Session[], short = false): string {
   const f = summariseSessions(sessions);
-  return f ? t("facts.ages", { min: f.ageMin, max: f.ageMax }) : "";
+  return f ? t(short ? "facts.ageRange" : "facts.ages", { min: f.ageMin, max: f.ageMax }) : "";
 }
 
 export function priceText(t: T, sessions: Session[]): string {
