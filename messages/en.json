@@ -80,7 +80,8 @@
     "licenceVerified": "Licence verified",
     "trialSession": "Trial session",
     "featured": "Featured",
-    "ageRange": "{min} to {max}"
+    "ageRange": "{min} to {max}",
+    "timeRange": "{start} to {end}"
   },
   "home": {
     "title": "Find your child's club, close to home.",
