@@ -13,6 +13,12 @@ Items marked **[CONFIRM]** are deliberately not resolved in code.
 - **App store rules** for apps used by or about children (needed before the native apps).
 - **Licences.** Which licence types and issuing authorities apply to which clubs (academy vs community). `licences.issuing_authority` is free text; the app does not assert which is correct.
 - **Paid-tier pricing.** No prices anywhere in v1. Principle recorded: one published price list, tiered by club size, never by club type or enquiry volume; paid tools manage and promote demand, never buy position.
+- **Illustrations are generated placeholders** (library v4, 36 files in `public/illustrations/`). Final artwork from an illustrator replaces them by swapping files and updating `lib/illustrations.ts`; no screen changes.
+- **Ball colour** in the illustrations is Berry with White markings. Alternatives are in `ball_options.png` (kept with the source zip, not shipped).
+- **Illustration skin-tone and hair tokens** (`--illo-skin-1`…`5`: #F3D2B3, #E3AE7C, #C98B52, #8F5A2E, #5E3B22; `--illo-hair-brown`: #3A2418) are outside the brand palette and need brand-owner sign-off. Illustration-only; never for text, controls or surfaces.
+- **Martial arts gi** is White on a Sand card, which is low contrast. Confirm with the illustrator.
+- **Hijab coverage.** Football, netball and swimming have no visible hijab variant (swimming_2 was generated with one, but the swim cap covers it). Their sets of four cannot include one; the unit test lists them as known gaps. Ask the illustrator for one variant each.
+- **Alt text** describes kit, hair and action in neutral words ("a player", "a gymnast") rather than guessing gender. Review the 36 sentences in `lib/illustrations.ts`.
 - **Sport dot shapes.** Only football and basketball are drawn for the dots-divide motion; the rest fall back to the plain doorway. Six to eight sports need drawing properly.
 - **Email delivery.** Magic links use Supabase's default mailer, which is rate-limited. Set up a real SMTP sender before launch.
 - **Print colour values** (CMYK) not set.
@@ -43,4 +49,8 @@ Items marked **[CONFIRM]** are deliberately not resolved in code.
 - **Admin access** is a `profiles.role = 'admin'` row, set by the seed or SQL; nobody can promote themselves (trigger + RLS test).
 - **Uploads go straight from the browser to Supabase Storage** (photos 5 MB, licences 10 MB), then a server action checks the stored path belongs to the club and records it. Hosts cap request bodies (Netlify ~6 MB, Vercel ~4.5 MB), so files never pass through the app server. Rules live in `lib/domain/uploads.ts`.
 - **Hosting.** Netlify, deploying from the private GitHub repo `wh2427-star/majlis-club`.
+- **Illustrations render as `<img>`, not inline SVG.** Each file stays its own document, so the shared `clipPath id="pn"` cannot collide; no id rewriting. Files ship unmodified (no SVGO; 7–18 KB each).
+- **One manifest** (`lib/illustrations.ts`) is the only code that knows the file paths (unit test). Serving is seeded (FNV-1a): headers use the area id, waitlist the area id, demand the club id, other screens a fixed screen id, so art never changes on refresh. A per-view picker prevents the same variant twice in a row.
+- **Where illustrations appear:** home sport picker ("Browse by sport", decorative because the sport name is the link text), results sport header (below the dots-divide motion), results empty state, waitlist page, family empty states (no saved clubs, no enquiries), add-your-club onboarding, demand view at zero views, and the style guide (all 36). Never on club profiles or cards.
+- **Results sport filter stays a select** inside the filters panel. Nine 160px illustrated chips would crowd a 360px screen; the illustrated picker is the home "Browse by sport" grid.
 - **Forms keep typed values** after a validation error (React resets forms after a form action by default).

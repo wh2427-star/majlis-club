@@ -45,7 +45,8 @@ First Playwright run: `npx playwright install chromium`.
 | `lib/services/` | Server-only use cases (validate with Zod, call Supabase) |
 | `lib/schemas/` | Zod schemas shared by forms and server |
 | `app/actions/` | Thin server actions calling `lib/services` |
-| `components/ui/`, `components/brand/` | Design-system components, placeholder logo, motion, illustrations |
+| `components/ui/`, `components/brand/` | Design-system components, placeholder logo, motion, `<Illustration>` |
+| `lib/illustrations.ts`, `public/illustrations/` | Illustration manifest (alt text, traits, serving rule) and the 36 placeholder SVGs |
 | `messages/en.json` | Every UI string (next-intl). Arabic is a second file later |
 | `supabase/migrations/` | Schema, RLS, storage, grants |
 | `scripts/seed.ts` | Demo data |
