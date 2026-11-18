@@ -72,8 +72,9 @@ export default async function ResultsPage({ searchParams }: { searchParams: Prom
       {result.featured.length ? (
         <section aria-labelledby="featured-title" className="mb-6" data-testid="featured-slot">
           <div className="mb-2 flex flex-wrap items-center gap-2">
-            <h2 id="featured-title" className="sr-only">{t("results.featuredTitle")}</h2>
-            <Badge kind="featured">{t("results.featuredTitle")}</Badge>
+            <h2 id="featured-title">
+              <Badge kind="featured">{t("results.featuredTitle")}</Badge>
+            </h2>
             <p className="text-sm">{t("results.featuredNote")}</p>
           </div>
           {result.featured.map((c) => (

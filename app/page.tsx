@@ -6,6 +6,8 @@ import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { Section } from "@/components/ui/Misc";
 import { SportIllustration } from "@/components/brand/illustrations/SportIllustration";
+import { DotsDivide } from "@/components/brand/DotsDivide";
+import { appConfig } from "@/config/app";
 
 export default async function Home() {
   const [t, areas, sports] = await Promise.all([getTranslations(), getAreas(), getSports()]);
@@ -15,6 +17,8 @@ export default async function Home() {
   return (
     <>
       <header className="mb-4">
+        {/* App launch: runs once per browser session, skipped under reduced motion. */}
+        <DotsDivide label={appConfig.name} size={64} onceKey="launch" />
         <h1 className="text-3xl font-semibold">{t("home.title")}</h1>
         <p className="mt-2">{t("home.intro")}</p>
       </header>

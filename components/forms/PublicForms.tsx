@@ -1,5 +1,5 @@
 "use client";
-import { useActionState, useState } from "react";
+import { startTransition, useActionState, useEffect, useRef, useState, type FormEvent } from "react";
 import { useTranslations } from "next-intl";
 import { joinWaitlistAction, reportPhotoAction, suggestClubAction, toggleSaveAction } from "@/app/actions/public";
 import { Button } from "@/components/ui/Button";
@@ -15,6 +15,25 @@ export function FormError({ state }: { state: ActionState }) {
   return <Notice tone="warning">{t(state.message)}</Notice>;
 }
 
+/**
+ * Like useActionState, but the form keeps what the user typed when the server returns errors.
+ * (React resets a form after a form action; we submit through onSubmit instead.)
+ * The form still has `action` so it works before JavaScript loads.
+ */
+export function useFormAction(fn: (state: ActionState, form: FormData) => Promise<ActionState>, resetOnSuccess = false) {
+  const [state, dispatch, pending] = useActionState(fn, initial);
+  const ref = useRef<HTMLFormElement>(null);
+  useEffect(() => {
+    if (resetOnSuccess && state.ok) ref.current?.reset();
+  }, [state, resetOnSuccess]);
+  const onSubmit = (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const data = new FormData(e.currentTarget);
+    startTransition(() => dispatch(data));
+  };
+  return { state, pending, formProps: { action: dispatch, onSubmit, ref } };
+}
+
 export function useFieldError(state: ActionState) {
   const t = useTranslations();
   return (name: string) => (state.errors?.[name] ? t(state.errors[name]) : undefined);
@@ -22,11 +41,11 @@ export function useFieldError(state: ActionState) {
 
 export function WaitlistForm({ areaId, areaName }: { areaId: string; areaName: string }) {
   const t = useTranslations("waitlist");
-  const [state, action, pending] = useActionState(joinWaitlistAction, initial);
+  const { state, pending, formProps } = useFormAction(joinWaitlistAction);
   const err = useFieldError(state);
   if (state.ok) return <Notice tone="success">{t("joined", { area: areaName })}</Notice>;
   return (
-    <form action={action} className="flex flex-col gap-3">
+    <form {...formProps} className="flex flex-col gap-3">
       <input type="hidden" name="areaId" value={areaId} />
       <TextField id="waitlist-email" name="email" type="email" autoComplete="email" required label={t("email")} error={err("email")} />
       <FormError state={state} />
@@ -37,11 +56,11 @@ export function WaitlistForm({ areaId, areaName }: { areaId: string; areaName: s
 
 export function SuggestClubForm({ areaId }: { areaId?: string }) {
   const t = useTranslations("results");
-  const [state, action, pending] = useActionState(suggestClubAction, initial);
+  const { state, pending, formProps } = useFormAction(suggestClubAction);
   const err = useFieldError(state);
   if (state.ok) return <Notice tone="success">{t("suggestThanks")}</Notice>;
   return (
-    <form action={action} className="flex flex-col gap-3">
+    <form {...formProps} className="flex flex-col gap-3">
       {areaId ? <input type="hidden" name="areaId" value={areaId} /> : null}
       <TextField id="suggest-name" name="clubName" required label={t("suggestName")} error={err("clubName")} />
       <TextArea id="suggest-note" name="note" label={t("suggestNote")} rows={2} />
@@ -54,7 +73,7 @@ export function SuggestClubForm({ areaId }: { areaId?: string }) {
 export function ReportPhotoForm({ photoId, signedIn }: { photoId: string; signedIn: boolean }) {
   const t = useTranslations("club");
   const [open, setOpen] = useState(false);
-  const [state, action, pending] = useActionState(reportPhotoAction, initial);
+  const { state, pending, formProps } = useFormAction(reportPhotoAction);
   if (state.ok) return <Notice tone="success">{t("reportSent")}</Notice>;
   if (!open)
     return (
@@ -70,7 +89,7 @@ export function ReportPhotoForm({ photoId, signedIn }: { photoId: string; signed
     );
   const reasons = ["child_named_in_caption", "no_consent", "inappropriate", "other"] as const;
   return (
-    <form action={action} className="mt-2 flex flex-col gap-3 rounded-card border-2 border-ink p-3" aria-label={t("reportTitle")}>
+    <form {...formProps} className="mt-2 flex flex-col gap-3 rounded-card border-2 border-ink p-3" aria-label={t("reportTitle")}>
       <input type="hidden" name="photoId" value={photoId} />
       <SelectField
         id={`reason-${photoId}`}
@@ -87,9 +106,9 @@ export function ReportPhotoForm({ photoId, signedIn }: { photoId: string; signed
 
 export function SaveClubButton({ clubId, saved }: { clubId: string; saved: boolean }) {
   const t = useTranslations("club");
-  const [state, action, pending] = useActionState(toggleSaveAction, initial);
+  const { state, pending, formProps } = useFormAction(toggleSaveAction);
   return (
-    <form action={action}>
+    <form {...formProps}>
       <input type="hidden" name="clubId" value={clubId} />
       <input type="hidden" name="save" value={saved ? "0" : "1"} />
       <Button type="submit" variant="secondary" disabled={pending} aria-pressed={saved}>

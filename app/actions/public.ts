@@ -12,9 +12,8 @@ export async function suggestClubAction(_: ActionState, form: FormData) {
 }
 
 export async function reportPhotoAction(_: ActionState, form: FormData) {
-  const res = await svc.reportPhoto(form);
-  if (res.ok) revalidatePath("/clubs/[slug]", "page");
-  return res;
+  // No revalidation here: the parent should see the confirmation; the photo is already hidden for everyone else.
+  return svc.reportPhoto(form);
 }
 
 export async function toggleSaveAction(_: ActionState, form: FormData) {

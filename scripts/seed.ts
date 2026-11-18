@@ -213,13 +213,13 @@ async function main() {
   const demoClubIds = Object.values(clubIds);
   must(await db.from("club_events").delete().in("club_id", demoClubIds), "clear events");
   const events: { club_id: string; kind: "view" | "enquiry"; created_at: string }[] = enquiries.map((e) => ({ club_id: e.club_id, kind: "enquiry", created_at: e.created_at }));
-  const views = (clubId: string, n: number, spread: number) => {
-    for (let i = 0; i < n; i++) events.push({ club_id: clubId, kind: "view", created_at: daysAgo((i * 7) % spread, 8 + (i % 12)) });
+  const views = (clubId: string, n: number, spread: number, offset = 0) => {
+    for (let i = 0; i < n; i++) events.push({ club_id: clubId, kind: "view", created_at: daysAgo(offset + ((i * 7) % spread), 8 + (i % 12)) });
   };
-  views(clubIds[demoOwnedClub], 128, 30);
-  views(clubIds[demoOwnedClub], 96, 60); // includes the previous 30 days
-  views(clubIds[demoOwnedClubQuiet], 3, 30);
-  for (const slug of Object.keys(clubIds)) if (slug !== demoOwnedClub && slug !== demoOwnedClubQuiet) views(clubIds[slug], 5 + (slug.length % 20), 30);
+  views(clubIds[demoOwnedClub], 128, 29);
+  views(clubIds[demoOwnedClub], 96, 29, 31); // the previous 30 days
+  views(clubIds[demoOwnedClubQuiet], 3, 29);
+  for (const slug of Object.keys(clubIds)) if (slug !== demoOwnedClub && slug !== demoOwnedClubQuiet) views(clubIds[slug], 5 + (slug.length % 20), 29);
   must(await db.from("club_events").insert(events), "events");
 
   // A reported photo for the admin queue (the trigger hides it while under review).

@@ -11,6 +11,10 @@ const nextConfig: NextConfig = {
       "*.css": { loaders: ["@tailwindcss/turbopack"], as: "*.css" },
     },
   },
+  // Photo uploads (5 MB) and licence documents (10 MB) go through server actions.
+  experimental: {
+    serverActions: { bodySizeLimit: "11mb" },
+  },
   images: {
     remotePatterns: [{ protocol: "https", hostname: "*.supabase.co" }],
   },

@@ -1,13 +1,10 @@
 "use client";
-import { useActionState } from "react";
 import { useTranslations } from "next-intl";
 import { addChildAction, sendEnquiryAction } from "@/app/actions/family";
 import { Button } from "@/components/ui/Button";
 import { Checkbox, SelectField, TextArea, TextField } from "@/components/ui/Field";
-import { FormError, useFieldError } from "./PublicForms";
-import type { ActionState } from "@/lib/services/public-actions";
+import { FormError, useFieldError, useFormAction } from "./PublicForms";
 
-const initial: ActionState = { ok: false };
 
 export function EnquiryForm({
   club,
@@ -21,10 +18,10 @@ export function EnquiryForm({
   sports: { id: string; label: string }[];
 }) {
   const t = useTranslations();
-  const [state, action, pending] = useActionState(sendEnquiryAction, initial);
+  const { state, pending, formProps } = useFormAction(sendEnquiryAction);
   const err = useFieldError(state);
   return (
-    <form action={action} className="flex flex-col gap-4" noValidate>
+    <form {...formProps} className="flex flex-col gap-4" noValidate>
       <input type="hidden" name="clubId" value={club.id} />
       <TextField id="enq-name" name="contactName" autoComplete="name" required defaultValue={contact.name} label={t("enquiry.name")} error={err("contactName")} />
       <TextField id="enq-email" name="contactEmail" type="email" autoComplete="email" required defaultValue={contact.email} label={t("enquiry.email")} error={err("contactEmail")} />
@@ -49,11 +46,11 @@ export function EnquiryForm({
 
 export function AddChildForm() {
   const t = useTranslations("family");
-  const [state, action, pending] = useActionState(addChildAction, initial);
+  const { state, pending, formProps } = useFormAction(addChildAction, true);
   const err = useFieldError(state);
   const year = new Date().getFullYear();
   return (
-    <form action={action} className="flex flex-col gap-3" aria-label={t("addChild")}>
+    <form {...formProps} className="flex flex-col gap-3" aria-label={t("addChild")}>
       <TextField id="child-nick" name="nickname" required maxLength={30} label={t("nickname")} hint={t("nicknameHint")} error={err("nickname")} />
       <TextField
         id="child-year" name="birthYear" type="number" inputMode="numeric" required min={year - 18} max={year - 2}
