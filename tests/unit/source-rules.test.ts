@@ -26,7 +26,8 @@ describe("source rules", () => {
         .replace(/\/\*[\s\S]*?\*\//g, "")
         .replace(/(^|[^:])\/\/.*$/gm, "$1")
         .toLowerCase();
-      expect(/stripe|invoice|checkout|billing|payment_intent/.test(code), f).toBe(false);
+      // "stripes" (illustration trait) is fine; the Stripe library is not.
+      expect(/\bstripe\b|invoice|checkout|billing|payment_intent/.test(code), f).toBe(false);
     }
   });
 });

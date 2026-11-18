@@ -53,3 +53,6 @@ next-env.d.ts
 # local helpers
 /scripts/.*.tmp.mjs
 /.claude/
+
+# Source art bundles (never shipped)
+*.zip

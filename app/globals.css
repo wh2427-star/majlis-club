@@ -27,6 +27,19 @@
 
 :root {
   color-scheme: light;
+
+  /*
+   * Illustration-only tokens: the skin tones and hair colour inside the illustration files.
+   * They sit outside the brand palette and outside @theme on purpose, so no Tailwind
+   * text-/bg-/border- utility exists for them. Never use them for text, controls or UI surfaces.
+   * [CONFIRM] values need brand-owner sign-off.
+   */
+  --illo-skin-1: #F3D2B3;
+  --illo-skin-2: #E3AE7C;
+  --illo-skin-3: #C98B52;
+  --illo-skin-4: #8F5A2E;
+  --illo-skin-5: #5E3B22;
+  --illo-hair-brown: #3A2418;
 }
 
 html {

@@ -15,6 +15,21 @@ export const colours = {
 
 export type ColourName = keyof typeof colours;
 
+/**
+ * Illustration-only colours: the five skin bands and the hair colour used inside the
+ * illustration files. Outside the brand palette; never for text, controls or UI surfaces.
+ * Mirrored in app/globals.css as --illo-* (not in @theme, so no utilities exist).
+ * [CONFIRM] values need brand-owner sign-off.
+ */
+export const illustrationOnly = {
+  "skin-1": "#F3D2B3",
+  "skin-2": "#E3AE7C",
+  "skin-3": "#C98B52",
+  "skin-4": "#8F5A2E",
+  "skin-5": "#5E3B22",
+  "hair-brown": "#3A2418",
+} as const;
+
 /** Font family is one token so Noto Sans can replace IBM Plex Sans in one place [CONFIRM]. */
 export const fontFamilyToken = "--font-brand";
 
