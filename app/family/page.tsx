@@ -8,6 +8,8 @@ import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { PageTitle, Section } from "@/components/ui/Misc";
 import { AddChildForm } from "@/components/forms/FamilyForms";
+import { IllustratedMessage } from "@/components/brand/Illustration";
+import { getAnyIllustration } from "@/lib/illustrations";
 import type { IconName } from "@/components/ui/Icon";
 
 export const metadata = { title: "Family" };
@@ -18,6 +20,7 @@ const statusIcon: Record<string, IconName> = { sent: "clock", seen: "check", rep
 export default async function FamilyPage() {
   await requireUser("/family");
   const [t, format, family] = await Promise.all([getTranslations(), getFormatter(), getFamily()]);
+  const savedArt = getAnyIllustration("family-saved");
   return (
     <>
       <PageTitle>{t("family.title")}</PageTitle>
@@ -82,7 +85,9 @@ export default async function FamilyPage() {
             ))}
           </ul>
         ) : (
-          <p>{t("family.noSaved")}</p>
+          <IllustratedMessage art={savedArt}>
+            <p>{t("family.noSaved")}</p>
+          </IllustratedMessage>
         )}
       </Section>
 
@@ -97,7 +102,9 @@ export default async function FamilyPage() {
             ))}
           </ul>
         ) : (
-          <p>{t("family.noEnquiries")}</p>
+          <IllustratedMessage art={getAnyIllustration("family-enquiries", savedArt.variant)}>
+            <p>{t("family.noEnquiries")}</p>
+          </IllustratedMessage>
         )}
       </Section>
     </>

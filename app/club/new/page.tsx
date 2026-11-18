@@ -7,6 +7,8 @@ import { Card } from "@/components/ui/Card";
 import { TextField } from "@/components/ui/Field";
 import { PageTitle, Section } from "@/components/ui/Misc";
 import { ClaimClubForm, CreateClubForm } from "@/components/forms/ClubForms";
+import { Illustration } from "@/components/brand/Illustration";
+import { getAnyIllustration } from "@/lib/illustrations";
 
 export const metadata = { title: "Add your club" };
 
@@ -17,6 +19,7 @@ export default async function NewClubPage({ searchParams }: { searchParams: Prom
   return (
     <>
       <PageTitle sub={t("onboard.intro")}>{t("onboard.title")}</PageTitle>
+      <Illustration art={getAnyIllustration("onboard")} size="md" priority className="mb-4" />
 
       <Section title={t("onboard.claimTitle")} id="claim">
         <Card>

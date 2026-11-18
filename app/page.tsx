@@ -5,7 +5,8 @@ import { Button, ButtonLink } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { Section } from "@/components/ui/Misc";
-import { SportIllustration } from "@/components/brand/illustrations/SportIllustration";
+import { Illustration } from "@/components/brand/Illustration";
+import { createIllustrationPicker, isIllustrationSport } from "@/lib/illustrations";
 import { DotsDivide } from "@/components/brand/DotsDivide";
 import { appConfig } from "@/config/app";
 
@@ -13,6 +14,7 @@ export default async function Home() {
   const [t, areas, sports] = await Promise.all([getTranslations(), getAreas(), getSports()]);
   const live = areas.filter((a) => a.status === "live");
   const soon = areas.filter((a) => a.status === "coming_soon");
+  const pickArt = createIllustrationPicker("home-sports");
 
   return (
     <>
@@ -69,7 +71,8 @@ export default async function Home() {
           {sports.map((s) => (
             <li key={s.slug}>
               <Link href={`/results?area=${live[0]?.slug ?? ""}&sport=${s.slug}`} className="block rounded-card bg-white p-2 hover:outline-2">
-                <SportIllustration sport={s.slug} alt="" className="w-full rounded-control" />
+                {/* Decorative: the sport name below is the link text. */}
+                {isIllustrationSport(s.slug) ? <Illustration art={pickArt(s.slug)} size="sm" decorative /> : null}
                 <span className="mt-1 block font-semibold">{t(`sports.${s.slug}`)}</span>
               </Link>
             </li>

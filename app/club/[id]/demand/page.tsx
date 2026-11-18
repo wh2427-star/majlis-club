@@ -6,6 +6,8 @@ import { Button, ButtonLink } from "@/components/ui/Button";
 import { Card, Panel } from "@/components/ui/Card";
 import { NumberStat, PageTitle, Section } from "@/components/ui/Misc";
 import type { IconName } from "@/components/ui/Icon";
+import { IllustratedMessage } from "@/components/brand/Illustration";
+import { getAnyIllustration } from "@/lib/illustrations";
 
 export const metadata = { title: "Demand" };
 
@@ -23,9 +25,15 @@ export default async function DemandPage({ params }: { params: Promise<{ id: str
         <NumberStat value={d.views} label={t("demand.views", { count: d.views })} />
         <NumberStat value={d.enquiries} label={t("demand.enquiries", { count: d.enquiries })} />
       </Card>
-      <p className="mt-3">
-        {d.views === 0 ? t("demand.commentaryZero") : t("demand.commentary", { views: d.views, enquiries: d.enquiries })}
-      </p>
+      {d.views === 0 ? (
+        <div className="mt-3">
+          <IllustratedMessage art={getAnyIllustration(`demand-zero:${club.id}`)}>
+            <p>{t("demand.commentaryZero")}</p>
+          </IllustratedMessage>
+        </div>
+      ) : (
+        <p className="mt-3">{t("demand.commentary", { views: d.views, enquiries: d.enquiries })}</p>
+      )}
       <p className="mt-1">{t("demand.previous", { views: d.prevViews, enquiries: d.prevEnquiries })}</p>
 
       {d.showUpgrade ? (

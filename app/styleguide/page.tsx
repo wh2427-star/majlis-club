@@ -6,12 +6,13 @@ import { Card } from "@/components/ui/Card";
 import { Checkbox, TextField } from "@/components/ui/Field";
 import { Notice, NumberStat, PageTitle, Section } from "@/components/ui/Misc";
 import { LogoMark, Logo } from "@/components/brand/Logo";
-import { SportIllustration } from "@/components/brand/illustrations/SportIllustration";
+import { Illustration } from "@/components/brand/Illustration";
+import { ILLUSTRATIONS } from "@/lib/illustrations";
 
-const SPORTS = ["football", "rugby", "basketball", "cricket", "swimming", "netball", "tennis", "gymnastics", "martial-arts"];
 
 export default async function StyleguidePage() {
   const t = await getTranslations("styleguide");
+  const tRoot = await getTranslations();
   return (
     <>
       <PageTitle sub={t("intro")}>{t("title")}</PageTitle>
@@ -79,10 +80,12 @@ export default async function StyleguidePage() {
       </Section>
 
       <Section title={t("illustrations")} id="sg-ill">
-        <ul className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-          {SPORTS.map((s) => (
-            <li key={s}>
-              <SportIllustration sport={s} alt={t("illustrationAlt", { sport: s })} className="w-full rounded-card" />
+        <p className="mb-2">{t("illustrationsNote")}</p>
+        <ul className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          {ILLUSTRATIONS.map((a) => (
+            <li key={a.src} className="flex flex-col gap-1">
+              <Illustration art={a} size="sm" />
+              <span className="text-sm">{tRoot(`sports.${a.sport}`)} {a.variant}</span>
             </li>
           ))}
         </ul>

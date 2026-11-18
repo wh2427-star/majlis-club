@@ -10,6 +10,8 @@ import { SelectField } from "@/components/ui/Field";
 import { Notice, Section } from "@/components/ui/Misc";
 import { SuggestClubForm } from "@/components/forms/PublicForms";
 import { SportHeader } from "@/components/brand/SportHeader";
+import { IllustratedMessage } from "@/components/brand/Illustration";
+import { getAnyIllustration, getIllustration, isIllustrationSport } from "@/lib/illustrations";
 
 export async function generateMetadata({ searchParams }: { searchParams: Promise<Record<string, string>> }) {
   const sp = await searchParams;
@@ -32,7 +34,7 @@ export default async function ResultsPage({ searchParams }: { searchParams: Prom
 
   return (
     <>
-      {filters.sport ? <SportHeader sport={filters.sport} /> : null}
+      {filters.sport ? <SportHeader sport={filters.sport} seed={area.id} /> : null}
       <header className="mb-3">
         <h1 className="text-2xl font-semibold sm:text-3xl">{title}</h1>
         <p className="mt-1">{t("results.count", { count: result.organic.length })}</p>
@@ -97,10 +99,14 @@ export default async function ResultsPage({ searchParams }: { searchParams: Prom
         </section>
       ) : (
         <section aria-labelledby="empty-title" data-testid="empty-state">
-          <Notice tone="info">
-            <h2 id="empty-title" className="font-semibold">{t("results.emptyTitle")}</h2>
-            <p>{t("results.emptyBody", { area: area.name })}</p>
-          </Notice>
+          <IllustratedMessage
+            art={filters.sport && isIllustrationSport(filters.sport) ? getIllustration(filters.sport, `empty:${area.id}`) : getAnyIllustration(`empty:${area.id}`)}
+          >
+            <Notice tone="info">
+              <h2 id="empty-title" className="font-semibold">{t("results.emptyTitle")}</h2>
+              <p>{t("results.emptyBody", { area: area.name })}</p>
+            </Notice>
+          </IllustratedMessage>
           {nearby.length ? (
             <Section title={t("results.nearbyTitle")} id="nearby-title">
               <ul className="flex flex-col gap-3">
