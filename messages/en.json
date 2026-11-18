@@ -338,7 +338,7 @@
     "views": "{count, plural, one {profile view} other {profile views}}",
     "enquiries": "{count, plural, one {enquiry} other {enquiries}}",
     "commentaryZero": "No parents have viewed your listing yet. Listings with photos and clear session times tend to get more views.",
-    "commentary": "{views, plural, one {# parent} other {# parents}} viewed your club and {enquiries, plural, =0 {none sent an enquiry yet} one {# sent an enquiry} other {# sent an enquiry}}.",
+    "commentary": "Parents viewed your club {views, plural, one {# time} other {# times}}, and {enquiries, plural, =0 {nobody has sent an enquiry yet} one {# enquiry came in} other {# enquiries came in}}.",
     "previous": "In the 30 days before that: {views} views and {enquiries} enquiries.",
     "enquiriesTitle": "Enquiries",
     "noEnquiries": "No enquiries yet.",

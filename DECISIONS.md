@@ -16,6 +16,8 @@ Items marked **[CONFIRM]** are deliberately not resolved in code.
 - **Sport dot shapes.** Only football and basketball are drawn for the dots-divide motion; the rest fall back to the plain doorway. Six to eight sports need drawing properly.
 - **Email delivery.** Magic links use Supabase's default mailer, which is rate-limited. Set up a real SMTP sender before launch.
 - **Print colour values** (CMYK) not set.
+- **View counting.** Demand "profile views" are page views (signed-out visitors included, the club's own members excluded), not unique parents, and are not rate-limited. The copy says "viewed your club N times" so it does not overclaim. Decide whether to deduplicate before showing these numbers in sales conversations.
+- **Supabase dashboard settings before launch.** Turn on leaked-password protection (Auth settings); set Site URL and redirect URLs for magic links; set up SMTP; rotate the service-role key (it was shared in a chat during setup).
 
 ## Choices made
 
@@ -28,3 +30,16 @@ Items marked **[CONFIRM]** are deliberately not resolved in code.
 - **RTL readiness.** A unit test bans physical-direction utilities (`ml-`, `pl-`, `text-left`, `left-`...) in components; use `ms-`, `ps-`, `text-start`, `start-`.
 - **Package manager.** npm. Node 22 LTS pinned in `.nvmrc`.
 - **Brand book PDF** is kept in the folder but not committed (12 MB).
+- **Extra tables.** `club_claims` (claiming an existing listing needs admin approval, so nobody can take over a club's page) and `club_suggestions` (the empty-state "suggest a club" form). `categories` sits above `sports` so hobby and holiday clubs are new rows, not a migration.
+- **Enquiries store a snapshot** of what the club received (name, email, phone, child nickname and birth year). Clubs never read parent or child tables.
+- **Reporting a photo needs a signed-in parent**, so one anonymous visitor cannot hide every photo. The photo is hidden the moment a report is filed.
+- **Featured slot** shows at most one club, only when that club already matches the parent's search, and only in the area it was bought for. The club also keeps its normal organic position.
+- **Upgrade prompt threshold** is enquiries in the last rolling 30 days (`UPGRADE_ENQUIRY_THRESHOLD`, default 10).
+- **New club location** defaults to its area's centre point until a location editor exists.
+- **Grants.** New Supabase projects give API roles no table privileges, so `20261117000006_grants.sql` grants the minimum per table; RLS then limits rows.
+- **Security-definer helpers** (`is_admin`, `is_club_member`, `club_is_public`, `club_badges`, `record_club_view`, `cluster_coverage`) stay callable over the API on purpose; each returns only booleans, public data, or nothing to non-admins. Supabase's advisor warns about them; accepted.
+- **Seed** is a TypeScript script (`npm run seed`) rather than `seed.sql`, because it also creates auth users and uploads placeholder images. Club "photos" are drawings of pitches and pools, never people.
+- **E2E tests reset the demo data** (global setup runs the seed) so runs are repeatable. Point them only at a dev project.
+- **Admin access** is a `profiles.role = 'admin'` row, set by the seed or SQL; nobody can promote themselves (trigger + RLS test).
+- **Server actions accept up to 11 MB** for photo (5 MB) and licence (10 MB) uploads.
+- **Forms keep typed values** after a validation error (React resets forms after a form action by default).
