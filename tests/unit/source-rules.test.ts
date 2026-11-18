@@ -21,8 +21,12 @@ describe("source rules", () => {
 
   it("contains no billing or payment code", () => {
     for (const f of files) {
-      const src = readFileSync(f, "utf8").toLowerCase();
-      expect(/stripe|invoice|checkout|billing/.test(src), f).toBe(false);
+      // Ignore comments (they may say "no billing"); check code only.
+      const code = readFileSync(f, "utf8")
+        .replace(/\/\*[\s\S]*?\*\//g, "")
+        .replace(/(^|[^:])\/\/.*$/gm, "$1")
+        .toLowerCase();
+      expect(/stripe|invoice|checkout|billing|payment_intent/.test(code), f).toBe(false);
     }
   });
 });
