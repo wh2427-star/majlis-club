@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getClubById, getCurrentUser, getMyClubs } from "@/lib/data/queries";
 import { clubListingSchema, fieldErrors, licenceSchema, photoSchema, sessionSchema } from "@/lib/schemas";
 import { licenceState, shouldShowUpgradePrompt } from "@/lib/domain/rules";
+import { weekChange, weeklyCounts } from "@/lib/domain/dashboard";
 import { appConfig } from "@/config/app";
 import { isValidUploadPath, uploadRules, type UploadKind } from "@/lib/domain/uploads";
 import { requireUser } from "./family";
@@ -229,23 +230,26 @@ export async function getLicenceStatus(clubId: string) {
   return { state, verifiedUntil: verified?.expiresOn, rejectReason: rows[0]?.rejectReason ?? "" };
 }
 
-/** Demand view: plain counts, honest even when small. Upgrade prompt only when enquiries cross the threshold. */
-export async function getDemand(clubId: string) {
+export type EnquiryRow = {
+  id: string; contact_name: string; contact_email: string; contact_phone: string | null; child_nickname: string | null;
+  child_birth_year: number | null; message: string; status: "sent" | "seen" | "replied" | "closed"; created_at: string;
+};
+
+/** Club dashboard: six weeks of real counts, honest even when small. Upgrade prompt only when 30-day enquiries cross the threshold. */
+export async function getDashboard(clubId: string) {
   const db = await createClient();
-  const now = Date.now();
-  const d30 = new Date(now - 30 * 864e5).toISOString();
-  const d60 = new Date(now - 60 * 864e5).toISOString();
-  const count = async (kind: "view" | "enquiry", from: string, to?: string) => {
-    let q = db.from("club_events").select("id", { count: "exact", head: true }).eq("club_id", clubId).eq("kind", kind).gte("created_at", from);
-    if (to) q = q.lt("created_at", to);
-    const { count: c } = await q;
-    return c ?? 0;
+  const now = new Date();
+  const d42 = new Date(now.getTime() - 42 * 864e5).toISOString();
+  const d30 = new Date(now.getTime() - 30 * 864e5).toISOString();
+  const enquiryCount = async (from: string) => {
+    const { count } = await db.from("club_events").select("id", { count: "exact", head: true }).eq("club_id", clubId).eq("kind", "enquiry").gte("created_at", from);
+    return count ?? 0;
   };
-  const [views, enquiries, prevViews, prevEnquiries, list] = await Promise.all([
-    count("view", d30),
-    count("enquiry", d30),
-    count("view", d60, d30),
-    count("enquiry", d60, d30),
+  const [viewRows, saves, enquiriesTotal, enquiries30, list] = await Promise.all([
+    db.from("club_events").select("created_at").eq("club_id", clubId).eq("kind", "view").gte("created_at", d42).limit(10000),
+    db.rpc("club_save_count", { p_club: clubId }),
+    enquiryCount(d42),
+    enquiryCount(d30),
     db
       .from("enquiries")
       .select("id, contact_name, contact_email, contact_phone, child_nickname, child_birth_year, message, status, created_at")
@@ -253,13 +257,16 @@ export async function getDemand(clubId: string) {
       .order("created_at", { ascending: false })
       .limit(50),
   ]);
+  const weeks = weeklyCounts((viewRows.data ?? []).map((r) => r.created_at as string), now);
   return {
-    views,
-    enquiries,
-    prevViews,
-    prevEnquiries,
-    list: list.data ?? [],
-    showUpgrade: shouldShowUpgradePrompt(enquiries, appConfig.upgradeEnquiryThreshold),
+    weeks,
+    viewsTotal: weeks.reduce((a, b) => a + b, 0),
+    viewsChange: weekChange(weeks[5], weeks[4]),
+    saves: (saves.data as number | null) ?? 0,
+    enquiriesTotal,
+    enquiries30,
+    showUpgrade: shouldShowUpgradePrompt(enquiries30, appConfig.upgradeEnquiryThreshold),
+    list: (list.data ?? []) as EnquiryRow[],
   };
 }
 

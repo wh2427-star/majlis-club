@@ -1,5 +1,5 @@
 import { getFormatter, getTranslations } from "next-intl/server";
-import { requireClubAccess, getDemand } from "@/lib/services/club";
+import { requireClubAccess, getDashboard } from "@/lib/services/club";
 import { setEnquiryStatusAction } from "@/app/actions/club";
 import { Badge } from "@/components/ui/Badge";
 import { Button, ButtonLink } from "@/components/ui/Button";
@@ -17,7 +17,9 @@ const statusIcon: Record<string, IconName> = { sent: "clock", seen: "check", rep
 export default async function DemandPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const { club } = await requireClubAccess(id, `/club/${id}/demand`);
-  const [t, format, d] = await Promise.all([getTranslations(), getFormatter(), getDemand(id)]);
+  const [t, format, dash] = await Promise.all([getTranslations(), getFormatter(), getDashboard(id)]);
+  // Temporary until the dashboard page replaces this view (Task 5).
+  const d = { views: dash.viewsTotal, enquiries: dash.enquiries30, prevViews: 0, prevEnquiries: 0, list: dash.list, showUpgrade: dash.showUpgrade };
   return (
     <>
       <PageTitle sub={t("demand.period")}>{t("demand.title", { name: club.name })}</PageTitle>

@@ -8,6 +8,8 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import {
   demoAccounts,
   demoOwnedClub,
+  demoWeeklyViews,
+  seedSaverCount,
   demoOwnedClubQuiet,
   firstClusterIdentified,
   placeholderPhotoSvg,
@@ -102,7 +104,9 @@ async function main() {
           area_id: area.id,
           lat: area.lat + c.offset[0],
           lng: area.lng + c.offset[1],
-          description: c.description,
+          // The quiet club is left without a description so the profile and checklist show gaps.
+          description: c.slug === demoOwnedClubQuiet ? "" : c.description,
+          primary_sport_id: sportBy[c.sessions[0][0]],
           status: "approved",
           typical_reply_days: c.type === "community" ? 4 : 2,
         })
@@ -191,6 +195,15 @@ async function main() {
     { parent_id: ids.parent, club_id: clubIds["palm-shade-tennis"] },
   ]), "saved");
 
+  // Fictional parents who shortlisted clubs (reused across runs; saves cascade away with the old clubs).
+  const savers: string[] = [];
+  for (let n = 1; n <= seedSaverCount; n++) savers.push(await ensureUser(`parent.seed.${n}@example.com`, `Seed Parent ${n}`, "parent"));
+  must(await db.from("saved_clubs").upsert([
+    ...savers.map((parent_id) => ({ parent_id, club_id: clubIds[demoOwnedClub] })),
+    ...savers.slice(0, 2).map((parent_id) => ({ parent_id, club_id: clubIds[demoOwnedClubQuiet] })),
+  ]), "seed saves");
+  must(await db.from("clubs").update({ coach_credentials: "Level 2 licensed coaches, First Aid certified", age_groups: ["6-8", "9-12"] }).eq("id", clubIds[demoOwnedClub]), "oryx extras");
+
   // Enquiries: 11 to the busy club in the last 30 days (crosses the default threshold of 10).
   const enquiries = Array.from({ length: 11 }, (_, i) => ({
     parent_id: i === 0 ? ids.parent : ids.parent2,
@@ -216,8 +229,9 @@ async function main() {
   const views = (clubId: string, n: number, spread: number, offset = 0) => {
     for (let i = 0; i < n; i++) events.push({ club_id: clubId, kind: "view", created_at: daysAgo(offset + ((i * 7) % spread), 8 + (i % 12)) });
   };
-  views(clubIds[demoOwnedClub], 128, 29);
-  views(clubIds[demoOwnedClub], 96, 29, 31); // the previous 30 days
+  demoWeeklyViews.forEach((n, w) => {
+    for (let k = 0; k < n; k++) events.push({ club_id: clubIds[demoOwnedClub], kind: "view", created_at: daysAgo((5 - w) * 7 + 1 + (k % 6), 8 + (k % 12)) });
+  });
   views(clubIds[demoOwnedClubQuiet], 3, 29);
   for (const slug of Object.keys(clubIds)) if (slug !== demoOwnedClub && slug !== demoOwnedClubQuiet) views(clubIds[slug], 5 + (slug.length % 20), 29);
   must(await db.from("club_events").insert(events), "events");
