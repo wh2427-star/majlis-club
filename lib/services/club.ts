@@ -5,7 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getClubById, getCurrentUser, getMyClubs } from "@/lib/data/queries";
 import { basicsSchema, fieldErrors, licenceSchema, photoSchema, sessionSchema } from "@/lib/schemas";
 import { licenceState, shouldShowUpgradePrompt } from "@/lib/domain/rules";
-import { weekChange, weeklyCounts } from "@/lib/domain/dashboard";
+import { viewsTrend } from "@/lib/domain/dashboard";
 import { appConfig } from "@/config/app";
 import { isValidUploadPath, uploadRules, type UploadKind } from "@/lib/domain/uploads";
 import { requireUser } from "./family";
@@ -118,7 +118,12 @@ export async function updateBasics(clubId: string, form: FormData): Promise<Acti
     })
     .eq("id", clubId);
   if (error) return { ok: false, message: "errors.generic" };
-  await db.from("club_sports").upsert({ club_id: clubId, sport_id: b.sportId }, { ignoreDuplicates: true });
+  // A club's sports are its session sports plus its main sport; a replaced main sport does not linger.
+  const { data: rows } = await db.from("club_sessions").select("sport_id").eq("club_id", clubId);
+  const sportIds = [...new Set([...(rows ?? []).map((r) => r.sport_id as string), b.sportId])];
+  const del = await db.from("club_sports").delete().eq("club_id", clubId);
+  const ins = await db.from("club_sports").insert(sportIds.map((sport_id) => ({ club_id: clubId, sport_id })));
+  if (del.error || ins.error) return { ok: false, message: "errors.generic" };
   return { ok: true, message: "editor.savedChanges" };
 }
 
@@ -242,8 +247,9 @@ export async function getDashboard(clubId: string) {
     const { count } = await db.from("club_events").select("id", { count: "exact", head: true }).eq("club_id", clubId).eq("kind", "enquiry").gte("created_at", from);
     return count ?? 0;
   };
-  const [viewRows, saves, enquiriesTotal, enquiries30, list] = await Promise.all([
-    db.from("club_events").select("created_at").eq("club_id", clubId).eq("kind", "view").gte("created_at", d42).limit(10000),
+  const [weekly, saves, enquiriesTotal, enquiries30, list] = await Promise.all([
+    // Counted in SQL: reading rows would be capped by the API's max rows and undercount busy clubs.
+    db.rpc("club_weekly_views", { p_club: clubId }),
     db.rpc("club_save_count", { p_club: clubId }),
     enquiryCount(d42),
     enquiryCount(d30),
@@ -254,11 +260,11 @@ export async function getDashboard(clubId: string) {
       .order("created_at", { ascending: false })
       .limit(50),
   ]);
-  const weeks = weeklyCounts((viewRows.data ?? []).map((r) => r.created_at as string), now);
+  const weeks = (weekly.data as number[] | null) ?? [0, 0, 0, 0, 0, 0];
   return {
     weeks,
     viewsTotal: weeks.reduce((a, b) => a + b, 0),
-    viewsChange: weekChange(weeks[5], weeks[4]),
+    viewsTrend: viewsTrend(weeks[5], weeks[4]),
     saves: (saves.data as number | null) ?? 0,
     enquiriesTotal,
     enquiries30,

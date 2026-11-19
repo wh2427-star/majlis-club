@@ -1,17 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { profileChecklist, weekChange, weeklyCounts } from "@/lib/domain/dashboard";
-
-const now = new Date("2026-11-19T12:00:00Z");
-const ago = (days: number) => new Date(now.getTime() - days * 864e5).toISOString();
-
-describe("weeklyCounts", () => {
-  it("buckets timestamps into six weeks, oldest first, ignoring older ones", () => {
-    expect(weeklyCounts([ago(1), ago(8), ago(41), ago(43)], now)).toEqual([1, 0, 0, 0, 1, 1]);
-  });
-  it("gives six zeros for no views", () => {
-    expect(weeklyCounts([], now)).toEqual([0, 0, 0, 0, 0, 0]);
-  });
-});
+import { profileChecklist, viewsTrend, weekChange } from "@/lib/domain/dashboard";
 
 describe("weekChange", () => {
   it("rounds the percentage change", () => {
@@ -34,5 +22,19 @@ describe("profileChecklist", () => {
   it("counts a description as done from 40 characters", () => {
     expect(profileChecklist({ ...blank, description: "x".repeat(39) })[0].done).toBe(false);
     expect(profileChecklist({ ...blank, description: "x".repeat(40) })[0].done).toBe(true);
+  });
+});
+
+describe("viewsTrend", () => {
+  it("never says 'no change' when views rose from zero", () => {
+    expect(viewsTrend(12, 0)).toEqual({ kind: "fromZero" });
+  });
+  it("says no change only when nothing changed", () => {
+    expect(viewsTrend(0, 0)).toEqual({ kind: "none" });
+    expect(viewsTrend(5, 5)).toEqual({ kind: "none" });
+  });
+  it("gives a signed percentage otherwise", () => {
+    expect(viewsTrend(94, 82)).toEqual({ kind: "percent", value: 15 });
+    expect(viewsTrend(0, 4)).toEqual({ kind: "percent", value: -100 });
   });
 });

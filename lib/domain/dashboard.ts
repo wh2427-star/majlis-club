@@ -1,24 +1,18 @@
 /** Club dashboard maths. Pure functions; no framework or database imports. */
 
-const WEEK_MS = 7 * 864e5;
-
-/** Counts per week, oldest first. Bucket i covers [now − (weeks−i)·7d, now − (weeks−i−1)·7d). */
-export function weeklyCounts(timestamps: string[], now: Date, weeks = 6): number[] {
-  const counts = new Array<number>(weeks).fill(0);
-  const end = now.getTime();
-  for (const ts of timestamps) {
-    const age = end - new Date(ts).getTime();
-    if (age < 0) continue;
-    const back = Math.floor(age / WEEK_MS);
-    if (back < weeks) counts[weeks - 1 - back]++;
-  }
-  return counts;
-}
-
 /** Rounded percentage change; null when there is nothing to compare with. */
 export function weekChange(current: number, previous: number): number | null {
   if (previous === 0) return null;
   return Math.round(((current - previous) / previous) * 100);
+}
+
+export type ViewsTrend = { kind: "none" } | { kind: "fromZero" } | { kind: "percent"; value: number };
+
+/** How this week's views compare with last week's, never claiming "no change" when views rose from zero. */
+export function viewsTrend(current: number, previous: number): ViewsTrend {
+  if (previous === 0) return current > 0 ? { kind: "fromZero" } : { kind: "none" };
+  const value = weekChange(current, previous) ?? 0;
+  return value === 0 ? { kind: "none" } : { kind: "percent", value };
 }
 
 export type ChecklistKey = "description" | "coachCredentials" | "ageGroups" | "photos" | "licence" | "schedule";

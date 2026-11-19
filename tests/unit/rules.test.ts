@@ -101,6 +101,15 @@ describe("basics schema (listing step 1)", () => {
   it("rejects an age group that is not offered", () => {
     expect(basicsSchema.safeParse({ ...ok, ageGroups: ["14-16"] }).success).toBe(false);
   });
+  it("treats an empty reply-days field as the default of 3", () => {
+    const r = basicsSchema.safeParse({ ...ok, typicalReplyDays: "" });
+    expect(r.success && r.data.typicalReplyDays).toBe(3);
+  });
+  it("explains a reply-days value out of range", () => {
+    const r = basicsSchema.safeParse({ ...ok, typicalReplyDays: "15" });
+    expect(r.success).toBe(false);
+    expect(r.error?.issues[0].message).toBe("errors.replyDays");
+  });
   it("caps coach credentials at 200 characters", () => {
     expect(basicsSchema.safeParse({ ...ok, coachCredentials: "x".repeat(201) }).success).toBe(false);
   });

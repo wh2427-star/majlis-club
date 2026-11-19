@@ -70,7 +70,10 @@ export const basicsSchema = z.object({
   ageGroups: z.array(z.enum(ageGroupValues, { message: "errors.ageGroups" })).min(1, "errors.ageGroups"),
   description: z.string().trim().max(1500, "errors.description").default(""),
   coachCredentials: z.string().trim().max(200, "errors.coachCredentials").default(""),
-  typicalReplyDays: z.coerce.number().int().min(1).max(14).default(3),
+  typicalReplyDays: z.preprocess(
+    (v) => (v === "" || v === null || v === undefined ? 3 : v),
+    z.coerce.number({ message: "errors.replyDays" }).int("errors.replyDays").min(1, "errors.replyDays").max(14, "errors.replyDays"),
+  ),
 });
 
 export const photoSchema = z.object({

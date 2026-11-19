@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { getFormatter, getTranslations } from "next-intl/server";
 import { getClubPhotos } from "@/lib/data/queries";
 import { getDashboard, getLicenceStatus, requireClubAccess } from "@/lib/services/club";
@@ -38,7 +39,16 @@ export default async function ClubDashboardPage({ params }: { params: Promise<{ 
     licenceVerified: licence.state === "verified",
     sessionCount: club.sessions.length,
   });
-  const change = d.viewsChange;
+  const trend = d.viewsTrend;
+  const trendNote =
+    trend.kind === "percent"
+      ? t("dashboard.viewsChange", { change: trend.value > 0 ? `+${trend.value}` : String(trend.value) })
+      : trend.kind === "fromZero" ? t("dashboard.viewsFromZero") : t("dashboard.viewsNoChange");
+  const manage: [string, string][] = [
+    [`/club/${club.id}/licence`, t("clubArea.licence")],
+    [`/club/${club.id}/photos`, t("clubArea.photos")],
+    ...(club.status === "approved" ? ([[`/clubs/${club.slug}`, t("clubArea.view")]] as [string, string][]) : []),
+  ];
   return (
     <>
       <div className="flex flex-wrap items-start justify-between gap-2">
@@ -46,11 +56,20 @@ export default async function ClubDashboardPage({ params }: { params: Promise<{ 
         {club.status === "approved" ? <Badge kind="status" icon="check">{t("dashboard.live")}</Badge> : null}
       </div>
       {club.status === "pending" ? <div className="mb-4"><Notice tone="warning">{t("club.pending")}</Notice></div> : null}
+      <nav aria-label={t("dashboard.manageLabel")} className="mb-4">
+        <ul className="flex flex-wrap gap-x-4">
+          {manage.map(([href, label]) => (
+            <li key={href}>
+              <Link href={href} className="inline-flex min-h-tap items-center underline underline-offset-4">{label}</Link>
+            </li>
+          ))}
+        </ul>
+      </nav>
 
       <section aria-label={t("dashboard.statsLabel")} className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         <StatCard
           testId="stat-views" label={t("dashboard.views")} value={d.viewsTotal}
-          note={change === null || change === 0 ? t("dashboard.viewsNoChange") : t("dashboard.viewsChange", { change: change > 0 ? `+${change}` : String(change) })}
+          note={trendNote}
         />
         <StatCard testId="stat-saves" label={t("dashboard.saves")} value={d.saves} note={t("dashboard.savesNote")} />
         <StatCard testId="stat-enquiries" label={t("dashboard.enquiries")} value={d.enquiriesTotal} note={t("dashboard.enquiriesNote")} />

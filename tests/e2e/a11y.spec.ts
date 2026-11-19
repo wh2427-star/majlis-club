@@ -47,6 +47,8 @@ for (const [role, paths] of signedInPages) {
 }
 
 test("axe on club management screens", async ({ page }) => {
+  // Four screens, each scanned at 360px and 200% zoom.
+  test.setTimeout(120_000);
   await signIn(page, "club");
   await page.goto("/club");
   await page.waitForURL(/\/club\/[0-9a-f-]{36}$/);

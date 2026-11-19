@@ -54,6 +54,7 @@ export function BasicsForm({ clubId, values, areas, sports }: { clubId?: string;
       />
       <TextField
         id="b-reply" name="typicalReplyDays" type="number" min={1} max={14} defaultValue={values?.typicalReplyDays ?? 3} label={t("editor.replyDays")}
+        error={err("typicalReplyDays")}
       />
       <FormError state={state} />
       <Button type="submit" disabled={pending}>{t("wizard.continueSchedule")}</Button>

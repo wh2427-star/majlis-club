@@ -241,7 +241,8 @@
     "tabsLabel": "Club sections",
     "tabDashboard": "Dashboard and Pro",
     "tabListing": "List your club",
-    "switcher": "Your clubs"
+    "switcher": "Your clubs",
+    "openClub": "Open club"
   },
   "dashboard": {
     "title": "Club dashboard",
@@ -251,6 +252,8 @@
     "views": "Profile views",
     "viewsChange": "{change}% this week",
     "viewsNoChange": "No change this week",
+    "viewsFromZero": "New views this week, none the week before",
+    "manageLabel": "Manage your listing",
     "saves": "Parent saves",
     "savesNote": "Shortlisted",
     "enquiries": "Enquiries",
@@ -474,6 +477,7 @@
   },
   "errors": {
     "ageGroups": "Choose at least one age group.",
+    "replyDays": "Choose between 1 and 14 days.",
     "coachCredentials": "Keep coach credentials under 200 characters.",
     "invalid": "Check this field.",
     "email": "Enter a valid email address.",
