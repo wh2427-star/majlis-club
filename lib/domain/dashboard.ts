@@ -15,7 +15,7 @@ export function viewsTrend(current: number, previous: number): ViewsTrend {
   return value === 0 ? { kind: "none" } : { kind: "percent", value };
 }
 
-export type ChecklistKey = "description" | "coachCredentials" | "ageGroups" | "photos" | "licence" | "schedule";
+export type ChecklistKey = "description" | "coachCredentials" | "ageGroups" | "photos" | "licence" | "schedule" | "prices";
 
 export function profileChecklist(p: {
   description: string;
@@ -24,6 +24,7 @@ export function profileChecklist(p: {
   photoCount: number;
   licenceVerified: boolean;
   sessionCount: number;
+  planCount: number;
 }): { key: ChecklistKey; done: boolean }[] {
   return [
     { key: "description", done: p.description.trim().length >= 40 },
@@ -32,5 +33,6 @@ export function profileChecklist(p: {
     { key: "photos", done: p.photoCount > 0 },
     { key: "licence", done: p.licenceVerified },
     { key: "schedule", done: p.sessionCount > 0 },
+    { key: "prices", done: p.planCount > 0 },
   ];
 }

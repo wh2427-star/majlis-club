@@ -3,7 +3,7 @@ import { captionNameWarning, coverage, isLicenceVerified, licenceState, shouldSh
 import { formatTime12, summariseSessions } from "@/lib/domain/facts";
 import { buildWeek } from "@/lib/domain/schedule";
 import { haversineKm } from "@/lib/domain/distance";
-import { basicsSchema } from "@/lib/schemas";
+import { basicsSchema, pricePlanSchema, trialRequestSchema } from "@/lib/schemas";
 
 describe("licence badge (rule 8)", () => {
   const today = "2026-11-18";
@@ -112,5 +112,48 @@ describe("basics schema (listing step 1)", () => {
   });
   it("caps coach credentials at 200 characters", () => {
     expect(basicsSchema.safeParse({ ...ok, coachCredentials: "x".repeat(201) }).success).toBe(false);
+  });
+});
+
+describe("pricePlanSchema", () => {
+  const err = (r: { success: boolean; error?: { issues: { message: string }[] } }) => r.error?.issues[0]?.message;
+  it("a term needs at least one session", () => {
+    expect(err(pricePlanSchema.safeParse({ kind: "per_term", priceAed: 900, sessionsCount: 0 }))).toBe("errors.termSessions");
+    expect(pricePlanSchema.safeParse({ kind: "per_term", priceAed: 900, sessionsCount: 12 }).success).toBe(true);
+  });
+  it("a block is 5 to 10 sessions", () => {
+    for (const n of [4, 11]) expect(err(pricePlanSchema.safeParse({ kind: "block", priceAed: 500, sessionsCount: n }))).toBe("errors.blockSessions");
+    for (const n of [5, 10]) expect(pricePlanSchema.safeParse({ kind: "block", priceAed: 500, sessionsCount: n }).success).toBe(true);
+  });
+  it("per-session and yearly plans drop any count", () => {
+    for (const kind of ["per_session", "per_year"]) {
+      const r = pricePlanSchema.safeParse({ kind, priceAed: 85, sessionsCount: 7 });
+      expect(r.success && r.data.sessionsCount).toBeNull();
+    }
+  });
+  it("limits label and price", () => {
+    expect(err(pricePlanSchema.safeParse({ kind: "per_session", priceAed: 85, label: "x".repeat(41) }))).toBe("errors.planLabel");
+    for (const p of [-1, 100001]) expect(err(pricePlanSchema.safeParse({ kind: "per_session", priceAed: p }))).toBe("errors.price");
+  });
+});
+
+describe("trialRequestSchema", () => {
+  const ymd = (offset: number) => { const d = new Date(); d.setDate(d.getDate() + offset); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
+  const base = {
+    clubId: "11111111-1111-4111-8111-111111111111", sessionId: "22222222-2222-4222-8222-222222222222",
+    childId: "33333333-3333-4333-8333-333333333333", preferredDate: ymd(0), contactName: "Sam", contactEmail: "sam@example.com", consent: "on",
+  };
+  const err = (v: object) => trialRequestSchema.safeParse(v).error?.issues[0]?.message;
+  it("date is today to 60 days ahead", () => {
+    expect(err({ ...base, preferredDate: ymd(-1) })).toBe("errors.trialDate");
+    expect(trialRequestSchema.safeParse(base).success).toBe(true);
+    expect(err({ ...base, preferredDate: ymd(61) })).toBe("errors.trialDate");
+  });
+  it("needs a child", () => {
+    expect(err({ ...base, childId: "" })).toBe("errors.child");
+    expect(trialRequestSchema.safeParse({ ...base, childId: "", childNickname: "Zara", childBirthYear: 2017 }).success).toBe(true);
+  });
+  it("needs consent", () => {
+    expect(err({ ...base, consent: undefined })).toBe("errors.consent");
   });
 });

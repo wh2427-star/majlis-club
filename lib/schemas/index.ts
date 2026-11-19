@@ -54,7 +54,7 @@ export const sessionSchema = z
     end: time,
     ageMin: z.coerce.number().int().min(2, "errors.age").max(18, "errors.age"),
     ageMax: z.coerce.number().int().min(2, "errors.age").max(18, "errors.age"),
-    priceAed: z.coerce.number().min(0, "errors.price").max(5000, "errors.price"),
+    trialAvailable: z.boolean().default(false),
   })
   .refine((s) => s.end > s.start, { message: "errors.endAfterStart", path: ["end"] })
   .refine((s) => s.ageMax >= s.ageMin, { message: "errors.ageRange", path: ["ageMax"] });
@@ -119,3 +119,47 @@ export function fieldErrors(error: z.ZodError): Record<string, string> {
   }
   return out;
 }
+
+export const planKinds = ["per_session", "per_term", "per_year", "block"] as const;
+
+/** One price plan. Terms need a session count; blocks are 5 to 10 sessions; the others take no count. */
+export const pricePlanSchema = z
+  .object({
+    kind: z.enum(planKinds, { message: "errors.planKind" }),
+    priceAed: z.coerce.number({ message: "errors.price" }).min(0, "errors.price").max(100000, "errors.price"),
+    sessionsCount: z.preprocess((v) => (v === "" || v === undefined ? null : v), z.coerce.number().int().nullable()),
+    label: z.string().trim().max(40, "errors.planLabel").default(""),
+  })
+  .superRefine((p, ctx) => {
+    const n = p.sessionsCount;
+    if (p.kind === "per_term" && (n == null || n < 1 || n > 100))
+      ctx.addIssue({ code: "custom", message: "errors.termSessions", path: ["sessionsCount"] });
+    if (p.kind === "block" && (n == null || n < 5 || n > 10))
+      ctx.addIssue({ code: "custom", message: "errors.blockSessions", path: ["sessionsCount"] });
+  })
+  .transform((p) => ({ ...p, sessionsCount: p.kind === "per_session" || p.kind === "per_year" ? null : p.sessionsCount }));
+
+/** Local calendar date as yyyy-mm-dd, offset by whole days. */
+export function isoDay(offsetDays = 0, from = new Date()) {
+  const d = new Date(from);
+  d.setDate(d.getDate() + offsetDays);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+/** A parent asks for a free trial. The child is either a saved child or typed in. */
+export const trialRequestSchema = z
+  .object({
+    clubId: z.string().uuid(),
+    sessionId: z.string().uuid("errors.trialSession"),
+    childId: z.string().uuid().optional().or(z.literal("")),
+    childNickname: z.string().trim().max(30, "errors.nickname").optional(),
+    childBirthYear: z.preprocess((v) => (v === "" ? undefined : v), z.coerce.number().int().min(2000, "errors.birthYear").max(2100, "errors.birthYear").optional()),
+    preferredDate: z
+      .string()
+      .regex(/^\d{4}-\d{2}-\d{2}$/, "errors.trialDate")
+      .refine((d) => d >= isoDay(0) && d <= isoDay(60), "errors.trialDate"),
+    contactName: trimmed(1, 80, "errors.name"),
+    contactEmail: z.string().trim().email("errors.email").max(254),
+    consent: z.literal("on", { message: "errors.consent" }),
+  })
+  .refine((r) => !!r.childId || (!!r.childNickname && r.childBirthYear != null), { message: "errors.child", path: ["childNickname"] });
