@@ -245,7 +245,52 @@
   },
   "dashboard": {
     "title": "Club dashboard",
-    "intro": "Visibility is free for every club. Manage incoming parent demand for {name}."
+    "intro": "Visibility is free for every club. Manage incoming parent demand for {name}.",
+    "live": "Free listing live",
+    "statsLabel": "Your numbers for the last 6 weeks",
+    "views": "Profile views",
+    "viewsChange": "{change}% this week",
+    "viewsNoChange": "No change this week",
+    "saves": "Parent saves",
+    "savesNote": "Shortlisted",
+    "enquiries": "Enquiries",
+    "enquiriesNote": "Direct questions",
+    "chartTitle": "6-week profile views",
+    "chartNote": "{count, plural, one {# enquiry} other {# enquiries}}",
+    "chartSummary": "Profile views per week, oldest first: {values}.",
+    "chartWeek": "Week",
+    "chartViews": "Views",
+    "weekLabel": "W{n}",
+    "addClub": "Add another club"
+  },
+  "pro": {
+    "title": "Club Pro",
+    "aside": "Optional tools for handling demand",
+    "intro": "Built to handle the enquiries and trial bookings above. Never alters search order.",
+    "locked": "Locked · Pro",
+    "comingSoon": "Coming soon",
+    "tools": {
+      "inbox": { "title": "Enquiry inbox", "body": "Centralise parent questions from your profile in one reply thread." },
+      "trials": { "title": "Trial and waitlist manager", "body": "Approve trial requests, cap class sizes, and auto-fill cancellations." },
+      "registration": { "title": "Term registration and attendance", "body": "Track renewals and mark poolside or pitchside attendance on mobile." },
+      "payments": { "title": "Payments and term billing", "body": "Collect monthly or termly AED fees with automatic receipts." },
+      "messaging": { "title": "Parent messaging", "body": "Send weather updates, pitch changes, and term reminders." },
+      "campaigns": { "title": "Campaigns and offers", "body": "Publish offers in the Promoted strip. Labelled Promoted. Never changes search order." },
+      "analytics": { "title": "Analytics", "body": "See age-group demand, conversion from view to trial, and retention." },
+      "store": { "title": "Club store", "body": "Sell kit and uniforms to your parents." }
+    }
+  },
+  "strength": {
+    "title": "Profile strength",
+    "progress": "{done} of {total} done",
+    "items": {
+      "description": { "action": "Add a description", "nudge": "Parents want to know how you coach and what children learn." },
+      "coachCredentials": { "action": "Add coach credentials", "nudge": "Licences and first aid help parents choose with confidence." },
+      "ageGroups": { "action": "Choose the age groups you serve", "nudge": "So parents can see at a glance whether their child fits." },
+      "photos": { "action": "Add photos", "nudge": "Clubs with photos get more saves." },
+      "licence": { "action": "Send your licence", "nudge": "A verified licence shows a badge on your listing." },
+      "schedule": { "action": "Add your sessions", "nudge": "Days, times and prices are the first things parents look for." }
+    }
   },
   "clubArea": {
     "title": "Your club",

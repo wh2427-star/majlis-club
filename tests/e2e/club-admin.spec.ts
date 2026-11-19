@@ -46,33 +46,59 @@ test("another club's dashboard is a 404", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "Club dashboard" })).toHaveCount(0);
 });
 
-test("demand view: big plain numbers and the upgrade prompt when demand crosses the threshold", async ({ page }) => {
+/** The number shown on a stat card. */
+async function stat(page: import("@playwright/test").Page, testId: string) {
+  return Number((await page.getByTestId(testId).getByTestId("stat-value").innerText()).replace(/\D/g, ""));
+}
+
+test("dashboard: real numbers, a 6-week chart and the upgrade prompt when demand crosses the threshold", async ({ page }) => {
   await signIn(page, "club");
   const busy = await clubBase(page, "Oryx Owls Football");
-  await page.goto(`${busy}/demand`);
-  const numbers = page.getByTestId("demand-numbers");
-  // 128 seeded views (plus any from other tests) and 11 seeded enquiries in the last 30 days.
-  const text = (await numbers.innerText()).replace(/\s+/g, " ");
-  const [views, enquiries] = text.match(/\d+/g)!.map(Number);
-  expect(views).toBeGreaterThanOrEqual(128);
-  expect(enquiries).toBe(11);
+  await page.goto(busy);
+  // 418 seeded views over six weeks (plus any from other tests), 64 seeded savers plus the demo parent, 11 enquiries.
+  expect(await stat(page, "stat-views")).toBeGreaterThanOrEqual(418);
+  expect(await stat(page, "stat-saves")).toBeGreaterThanOrEqual(64);
+  expect(await stat(page, "stat-enquiries")).toBe(11);
+  await expect(page.getByTestId("stat-views")).toContainText(/[+-]?\d+% this week|No change this week/);
+  const cells = await page.getByTestId("views-chart").locator("table td").allInnerTexts();
+  expect(cells.map(Number)).toHaveLength(6);
+  [48, 62, 58, 74, 82, 94].forEach((seeded, i) => expect(Number(cells[i])).toBeGreaterThanOrEqual(seeded));
   await expect(page.getByTestId("upgrade-prompt")).toBeVisible();
+  await expect(page.locator("body")).not.toContainText(/AED \d+/);
   await page.getByRole("link", { name: "See the paid tools" }).click();
   await expect(page.getByText("Paid tools are not available yet.")).toBeVisible();
-  await expect(page.locator("body")).not.toContainText(/AED \d+ a (month|year)/);
 });
 
 test("quiet club sees small numbers honestly, including zero, and no upgrade prompt", async ({ page }) => {
   await signIn(page, "club");
   const quiet = await clubBase(page, "Camel Cove Cricket");
-  await page.goto(`${quiet}/demand`);
-  const text = (await page.getByTestId("demand-numbers").innerText()).replace(/\s+/g, " ");
-  const [views, enquiries] = text.match(/\d+/g)!.map(Number);
+  await page.goto(quiet);
+  const views = await stat(page, "stat-views");
   expect(views).toBeGreaterThanOrEqual(3);
   expect(views).toBeLessThan(10);
-  expect(enquiries).toBe(0);
-  await expect(page.getByTestId("demand-numbers")).toContainText("enquiries");
+  expect(await stat(page, "stat-enquiries")).toBe(0);
+  await expect(page.getByTestId("stat-views")).not.toContainText(/NaN|Infinity/);
   await expect(page.getByTestId("upgrade-prompt")).toHaveCount(0);
+  await expect(page.getByTestId("profile-strength")).toContainText("Add a description");
+});
+
+test("old demand link redirects to the dashboard enquiries", async ({ page }) => {
+  await signIn(page, "club");
+  const base = await clubBase(page, "Oryx Owls Football");
+  await page.goto(`${base}/demand`);
+  await page.waitForURL((u) => u.pathname === base);
+  await expect(page.getByRole("heading", { name: "Enquiries", exact: true })).toBeVisible();
+});
+
+test("Pro tools are locked and never priced", async ({ page }) => {
+  await signIn(page, "club");
+  await page.goto(await clubBase(page, "Oryx Owls Football"));
+  const pro = page.getByTestId("club-pro");
+  await expect(pro.getByText("Locked · Pro")).toHaveCount(7);
+  await expect(pro.getByText("Coming soon")).toHaveCount(1);
+  await expect(pro).toContainText("Never alters search order.");
+  // The payments card mentions "AED fees" (screenshot copy); no amounts or prices anywhere.
+  await expect(pro).not.toContainText(/AED\s*\d|\d+\s*AED|\$\s*\d|per month|a month/i);
 });
 
 test("listing editor shows a live preview in the parent's order", async ({ page }) => {

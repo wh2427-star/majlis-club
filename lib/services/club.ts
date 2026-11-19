@@ -271,7 +271,7 @@ export async function getDashboard(clubId: string) {
 }
 
 export async function setEnquiryStatus(clubId: string, enquiryId: string, status: "seen" | "replied" | "closed") {
-  await requireClubAccess(clubId, `/club/${clubId}/demand`);
+  await requireClubAccess(clubId, `/club/${clubId}`);
   const db = await createClient();
   await db.from("enquiries").update({ status }).eq("id", enquiryId).eq("club_id", clubId);
 }

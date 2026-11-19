@@ -48,5 +48,5 @@ export async function setEnquiryStatusAction(form: FormData) {
   const status = String(form.get("status") ?? "");
   if (status !== "seen" && status !== "replied" && status !== "closed") return;
   await club.setEnquiryStatus(clubId, String(form.get("enquiryId") ?? ""), status);
-  revalidatePath(`/club/${clubId}/demand`);
+  revalidatePath(`/club/${clubId}`);
 }

@@ -17,7 +17,8 @@ const publicPages = [
 
 const signedInPages: [Role, string[]][] = [
   ["parent", ["/family", "/enquire/ghaf-tree-swim-squad"]],
-  ["club", ["/club", "/club/new", "/club/upgrade"]],
+  // "/club" redirects club owners to their dashboard, which the club management test covers.
+  ["club", ["/club/new", "/club/upgrade"]],
   ["admin", ["/admin/licences", "/admin/photos", "/admin/approvals", "/admin/coverage"]],
 ];
 
@@ -48,10 +49,9 @@ for (const [role, paths] of signedInPages) {
 test("axe on club management screens", async ({ page }) => {
   await signIn(page, "club");
   await page.goto("/club");
-  const manage = page.getByRole("link", { name: "Edit listing" }).first();
-  const editHref = (await manage.getAttribute("href"))!;
-  const base = editHref.replace("/edit", "");
-  for (const sub of ["/edit", "/photos", "/licence", "/demand"]) {
+  await page.waitForURL(/\/club\/[0-9a-f-]{36}$/);
+  const base = new URL(page.url()).pathname;
+  for (const sub of ["", "/edit", "/photos", "/licence"]) {
     await page.setViewportSize({ width: 360, height: 780 });
     await page.goto(base + sub);
     await expectNoSeriousA11yIssues(page);
