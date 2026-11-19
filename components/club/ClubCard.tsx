@@ -3,6 +3,7 @@ import { useTranslations } from "next-intl";
 import type { RankedClub } from "@/lib/domain/search";
 import { ClubFacts } from "./ClubFacts";
 import { ClubBadges } from "./ClubBadges";
+import { plansForSessions } from "@/lib/domain/pricing";
 
 /** Facts first, then badges, then a short line of the club's own copy. */
 export function ClubCard({ club, areaSlug, featured = false }: { club: RankedClub; areaSlug: string; featured?: boolean }) {
@@ -18,7 +19,13 @@ export function ClubCard({ club, areaSlug, featured = false }: { club: RankedClu
           {club.name}
         </Link>
       </h3>
-      <ClubFacts sessions={club.matchingSessions} sports={club.sports} areaName={club.areaName} distanceKm={club.distanceKm} />
+      <ClubFacts
+        sessions={club.matchingSessions}
+        sports={club.sports}
+        areaName={club.nearestVenue?.areaName ?? club.areaName}
+        plans={plansForSessions(club, club.matchingSessions)}
+        distanceKm={club.distanceKm}
+      />
       <div className="mt-3">
         <ClubBadges licenceVerified={club.licenceVerified} trialOffer={club.trialOffer} />
       </div>

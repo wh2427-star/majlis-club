@@ -42,7 +42,7 @@ export function ScheduleForm({
   const preview = useMemo(
     () => ({
       ...profile,
-      sessions: sessions.map((s, i) => ({ id: String(i), ...s })),
+      sessions: sessions.map((s, i) => ({ id: String(i), ...s, venueId: "", groupId: "", trialAvailable: false })),
       sports: [...new Set([...sessions.map((s) => s.sportSlug), ...(primarySportId ? [sportSlug(primarySportId)] : [])])].filter(Boolean),
     }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -88,6 +88,7 @@ export function ScheduleForm({
           headingLevel={2}
           photos={photos.length ? <PhotoGallery photos={photos} signedIn={false} reportable={false} /> : null}
           actions={<Button type="button" disabled>{t("club.sendEnquiry")}</Button>}
+          trialAction={() => <Button type="button" variant="secondary" disabled>{t("trial.book")}</Button>}
         />
       </section>
     </div>

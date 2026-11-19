@@ -25,6 +25,7 @@ export default async function PreviewPage({ params }: { params: Promise<{ id: st
           headingLevel={2}
           photos={visible.length ? <PhotoGallery photos={visible} signedIn={false} reportable={false} /> : null}
           actions={<Button type="button" disabled>{t("club.sendEnquiry")}</Button>}
+          trialAction={() => <Button type="button" variant="secondary" disabled>{t("trial.book")}</Button>}
         />
       </section>
       <ButtonLink href={`/club/${club.id}`} className="mt-6">{t("wizard.backToDashboard")}</ButtonLink>

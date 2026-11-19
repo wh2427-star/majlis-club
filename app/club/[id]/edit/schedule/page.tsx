@@ -23,8 +23,9 @@ export default async function SchedulePage({ params, searchParams }: { params: P
         profile={{
           name: club.name, clubType: club.clubType, areaName: club.areaName, description: club.description, coachCredentials: club.coachCredentials,
           licenceVerified: club.licenceVerified, trialOffer: club.trialOffer, typicalReplyDays: club.typicalReplyDays,
+          venues: club.venues, groups: club.groups, pricePlans: club.pricePlans,
         }}
-        sessions={club.sessions.map((s) => ({ sportId: sportId(s.sportSlug), sportSlug: s.sportSlug, day: s.day, start: s.start, end: s.end, ageMin: s.ageMin, ageMax: s.ageMax, priceAed: s.priceAed }))}
+        sessions={club.sessions.map((s) => ({ sportId: sportId(s.sportSlug), sportSlug: s.sportSlug, day: s.day, start: s.start, end: s.end, ageMin: s.ageMin, ageMax: s.ageMax, priceAed: 0 }))}
         primarySportId={club.primarySportId}
         sports={sports.map((s) => ({ value: s.id, label: t(`sports.${s.slug}`), slug: s.slug }))}
         photos={photos}

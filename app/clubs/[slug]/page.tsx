@@ -47,6 +47,18 @@ export default async function ClubPage({ params, searchParams }: Props) {
       distanceKm={distanceKm}
       photos={photos.length ? <PhotoGallery photos={photos} signedIn={!!user} /> : null}
       actions={actions}
+      trialAction={
+        club.status !== "approved"
+          ? undefined
+          : (s) => {
+              const href = `/trial/${club.slug}?session=${s.id}`;
+              return (
+                <ButtonLink href={user ? href : `/auth/sign-in?next=${encodeURIComponent(href)}`} variant="secondary">
+                  {t("trial.book")}
+                </ButtonLink>
+              );
+            }
+      }
     />
   );
 }

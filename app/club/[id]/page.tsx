@@ -38,6 +38,7 @@ export default async function ClubDashboardPage({ params }: { params: Promise<{ 
     photoCount: photos.filter((p) => p.status === "visible").length,
     licenceVerified: licence.state === "verified",
     sessionCount: club.sessions.length,
+    planCount: club.pricePlans.length + club.groups.reduce((n, g) => n + g.plans.length, 0),
   });
   const trend = d.viewsTrend;
   const trendNote =

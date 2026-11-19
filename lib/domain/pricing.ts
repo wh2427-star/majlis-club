@@ -40,3 +40,12 @@ export function plansForGroup(
   const own = club.groups.find((g) => g.id === groupId)?.plans ?? [];
   return own.length ? own : club.pricePlans;
 }
+
+/** Every price that applies to these sessions (each session's group plans, or the club-wide ones). */
+export function plansForSessions(
+  club: { groups: { id: string; plans: PricePlan[] }[]; pricePlans: PricePlan[] },
+  sessions: { groupId: string }[],
+): PricePlan[] {
+  const groupIds = [...new Set(sessions.map((s) => s.groupId))];
+  return groupIds.flatMap((id) => plansForGroup(club, id));
+}

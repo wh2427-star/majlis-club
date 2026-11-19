@@ -151,7 +151,7 @@ export async function updateSchedule(clubId: string, form: FormData): Promise<Ac
     const { error } = await db.from("club_sessions").insert(
       sessions.map((s) => ({
         club_id: clubId, sport_id: s.sportId, day: s.day, start_time: s.start, end_time: s.end,
-        age_min: s.ageMin, age_max: s.ageMax, price_aed: s.priceAed,
+        age_min: s.ageMin, age_max: s.ageMax,
       })),
     );
     if (error) return { ok: false, message: "errors.generic" };

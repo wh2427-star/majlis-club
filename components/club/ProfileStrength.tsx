@@ -4,7 +4,7 @@ import type { ChecklistKey } from "@/lib/domain/dashboard";
 import { ProgressBar } from "@/components/ui/Misc";
 
 const target = (clubId: string, key: ChecklistKey) =>
-  key === "photos" ? `/club/${clubId}/photos` : key === "licence" ? `/club/${clubId}/licence` : key === "schedule" ? `/club/${clubId}/edit/schedule` : `/club/${clubId}/edit`;
+  key === "photos" ? `/club/${clubId}/photos` : key === "licence" ? `/club/${clubId}/licence` : key === "schedule" || key === "prices" ? `/club/${clubId}/edit/schedule` : `/club/${clubId}/edit`;
 
 /** What is missing from the listing, with a nudge for each. Hidden when the profile is complete. */
 export async function ProfileStrength({ clubId, items }: { clubId: string; items: { key: ChecklistKey; done: boolean }[] }) {

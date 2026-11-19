@@ -59,14 +59,24 @@
       "6": "Sunday"
     }
   },
+  "trial": {
+    "book": "Book a free trial"
+  },
   "clubType": {
     "academy": "Academy",
     "community": "Community club"
   },
   "facts": {
     "ages": "Ages {min} to {max}",
-    "price": "AED {price} a session",
-    "priceRange": "AED {min} to {max} a session",
+    "priceFrom": "from AED {price} a session",
+    "pricePerYear": "AED {price} a year",
+    "plan": {
+      "per_session": "AED {price} a session",
+      "per_term": "AED {price} a term ({count} sessions)",
+      "per_year": "AED {price} a year",
+      "block": "AED {price} for {count} sessions"
+    },
+    "planLabelled": "{label}: {text}",
     "dayTimes": "{days}, {time}",
     "sport": "Sport",
     "agesLabel": "Ages",
@@ -135,6 +145,10 @@
     "noPhotos": "This club has not added photos yet.",
     "aboutTitle": "About the club",
     "coachesTitle": "Coaches",
+    "venuesTitle": "Where and when",
+    "groupPrices": "Prices",
+    "pricesTitle": "Prices at every venue",
+    "pricesIntro": "For any group without its own prices.",
     "sendEnquiry": "Send enquiry",
     "saveClub": "Save club",
     "saved": "Saved",
@@ -292,7 +306,8 @@
       "ageGroups": { "action": "Choose the age groups you serve", "nudge": "So parents can see at a glance whether their child fits." },
       "photos": { "action": "Add photos", "nudge": "Clubs with photos get more saves." },
       "licence": { "action": "Send your licence", "nudge": "A verified licence shows a badge on your listing." },
-      "schedule": { "action": "Add your sessions", "nudge": "Days, times and prices are the first things parents look for." }
+      "schedule": { "action": "Add your sessions", "nudge": "Days, times and prices are the first things parents look for." },
+      "prices": { "action": "Add your prices", "nudge": "Per session, per term, per year or a block. Price is a fact on every card." }
     }
   },
   "clubArea": {
