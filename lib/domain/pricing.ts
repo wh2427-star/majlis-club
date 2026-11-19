@@ -31,3 +31,12 @@ export function withinMaxPrice(plans: PricePlan[], maxAed: number): boolean {
     return v != null && v <= maxAed;
   });
 }
+
+/** The prices that apply to a group: its own when it has any, otherwise the club-wide ones. */
+export function plansForGroup(
+  club: { groups: { id: string; plans: PricePlan[] }[]; pricePlans: PricePlan[] },
+  groupId: string,
+): PricePlan[] {
+  const own = club.groups.find((g) => g.id === groupId)?.plans ?? [];
+  return own.length ? own : club.pricePlans;
+}

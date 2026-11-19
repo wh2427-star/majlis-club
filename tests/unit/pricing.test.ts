@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { cardPrice, perSessionEquivalent, withinMaxPrice, type PlanKind, type PricePlan } from "@/lib/domain/pricing";
+import { cardPrice, plansForGroup, perSessionEquivalent, withinMaxPrice, type PlanKind, type PricePlan } from "@/lib/domain/pricing";
 
 const plan = (kind: PlanKind, priceAed: number, sessionsCount: number | null = null): PricePlan => ({ kind, priceAed, sessionsCount, label: "" });
 
@@ -21,5 +21,18 @@ describe("pricing", () => {
     expect(withinMaxPrice([plan("per_session", 85)], 60)).toBe(false);
     expect(withinMaxPrice([plan("per_year", 100)], 60)).toBe(false);
     expect(withinMaxPrice([], 60)).toBe(false);
+  });
+});
+
+describe("plansForGroup", () => {
+  const clubWide = [plan("per_session", 95)];
+  const groups = [
+    { id: "g1", venueId: "v", name: "", ageMin: 6, ageMax: 8, plans: [plan("per_session", 85)] },
+    { id: "g2", venueId: "v", name: "", ageMin: 9, ageMax: 12, plans: [] },
+  ];
+  it("uses the group's own plans, else the club-wide ones", () => {
+    expect(plansForGroup({ groups, pricePlans: clubWide }, "g1")).toEqual([plan("per_session", 85)]);
+    expect(plansForGroup({ groups, pricePlans: clubWide }, "g2")).toEqual(clubWide);
+    expect(plansForGroup({ groups, pricePlans: clubWide }, "missing")).toEqual(clubWide);
   });
 });

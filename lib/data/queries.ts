@@ -1,7 +1,8 @@
 import "server-only";
 import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
-import type { ClubSummary, Session } from "@/lib/domain/types";
+import type { ClubSummary, Group, Session, Venue } from "@/lib/domain/types";
+import type { PlanKind, PricePlan } from "@/lib/domain/pricing";
 
 export type Area = { id: string; slug: string; name: string; lat: number; lng: number; status: "live" | "coming_soon"; clusterId: string };
 export type Sport = { id: string; slug: string; name: string };
@@ -25,15 +26,29 @@ type ClubRow = {
   description: string; typical_reply_days: number; status: string;
   coach_credentials: string; age_groups: string[]; primary_sport_id: string | null;
   areas: { name: string } | null;
-  club_sessions: { id: string; day: number; start_time: string; end_time: string; age_min: number; age_max: number; price_aed: number; sports: { slug: string } | null }[];
+  club_sessions: { id: string; day: number; start_time: string; end_time: string; age_min: number; age_max: number; group_id: string; trial_available: boolean; sports: { slug: string } | null }[];
+  club_venues: { id: string; name: string; area_id: string; lat: number; lng: number; sort: number; areas: { name: string } | null }[];
+  club_groups: { id: string; venue_id: string; name: string; age_min: number; age_max: number; sort: number }[];
+  club_price_plans: PlanRow[];
   club_sports: { sports: { slug: string } | null }[];
   club_photos: { id: string }[];
 };
 
 const CLUB_SELECT =
-  "id, slug, name, club_type, area_id, lat, lng, description, typical_reply_days, status, coach_credentials, age_groups, primary_sport_id, areas(name), club_sessions(id, day, start_time, end_time, age_min, age_max, price_aed, sports(slug)), club_sports(sports(slug)), club_photos(id)";
+  "id, slug, name, club_type, area_id, lat, lng, description, typical_reply_days, status, coach_credentials, age_groups, primary_sport_id, areas(name), club_sessions(id, day, start_time, end_time, age_min, age_max, group_id, trial_available, sports(slug)), club_sports(sports(slug)), club_photos(id), " +
+  "club_venues(id, name, area_id, lat, lng, sort, areas(name)), club_groups(id, venue_id, name, age_min, age_max, sort), " +
+  "club_price_plans(id, group_id, kind, price_aed, sessions_count, label, sort)";
 
-function toSession(s: ClubRow["club_sessions"][number]): Session {
+type PlanRow = { id: string; group_id: string | null; kind: PlanKind; price_aed: number; sessions_count: number | null; label: string; sort: number };
+
+/** Plans in the order the owner entered them. */
+function toPlans(rows: PlanRow[]): PricePlan[] {
+  return [...rows]
+    .sort((a, b) => a.sort - b.sort)
+    .map((p) => ({ id: p.id, kind: p.kind, priceAed: Number(p.price_aed), sessionsCount: p.sessions_count, label: p.label ?? "" }));
+}
+
+function toSession(s: ClubRow["club_sessions"][number], venueOf: Map<string, string>): Session {
   return {
     id: s.id,
     sportSlug: s.sports?.slug ?? "",
@@ -42,13 +57,24 @@ function toSession(s: ClubRow["club_sessions"][number]): Session {
     end: s.end_time.slice(0, 5),
     ageMin: s.age_min,
     ageMax: s.age_max,
-    priceAed: Number(s.price_aed),
+    venueId: venueOf.get(s.group_id) ?? "",
+    groupId: s.group_id,
+    trialAvailable: s.trial_available,
   };
 }
 
 type Badges = { licence_verified: boolean; trial_offer: boolean; featured_area_ids: string[] };
 
 export function toSummary(row: ClubRow, badges?: Badges): ClubSummary & { typicalReplyDays: number; status: string; coachCredentials: string; ageGroups: string[]; primarySportId: string | null } {
+  const venues: Venue[] = [...(row.club_venues ?? [])]
+    .sort((a, b) => a.sort - b.sort)
+    .map((v) => ({ id: v.id, name: v.name, areaId: v.area_id, areaName: v.areas?.name ?? "", lat: v.lat, lng: v.lng }));
+  const plans = row.club_price_plans ?? [];
+  const groups: Group[] = [...(row.club_groups ?? [])]
+    .sort((a, b) => a.sort - b.sort)
+    .map((g) => ({ id: g.id, venueId: g.venue_id, name: g.name, ageMin: g.age_min, ageMax: g.age_max, plans: toPlans(plans.filter((p) => p.group_id === g.id)) }));
+  const venueOf = new Map(groups.map((g) => [g.id, g.venueId]));
+  const sessions = row.club_sessions.map((s) => toSession(s, venueOf)).sort((a, b) => a.day - b.day || a.start.localeCompare(b.start));
   return {
     id: row.id,
     slug: row.slug,
@@ -60,11 +86,15 @@ export function toSummary(row: ClubRow, badges?: Badges): ClubSummary & { typica
     lng: row.lng,
     description: row.description,
     sports: row.club_sports.map((s) => s.sports?.slug ?? "").filter(Boolean),
-    sessions: row.club_sessions.map(toSession).sort((a, b) => a.day - b.day || a.start.localeCompare(b.start)),
+    sessions,
     licenceVerified: badges?.licence_verified ?? false,
-    trialOffer: badges?.trial_offer ?? false,
+    // The trial badge means a session can actually be booked for a free trial.
+    trialOffer: sessions.some((s) => s.trialAvailable),
     featuredAreaIds: badges?.featured_area_ids ?? [],
     photoCount: row.club_photos.length,
+    venues,
+    groups,
+    pricePlans: toPlans(plans.filter((p) => p.group_id === null)),
     typicalReplyDays: row.typical_reply_days,
     status: row.status,
     coachCredentials: row.coach_credentials ?? "",

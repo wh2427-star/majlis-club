@@ -1,10 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { rankClubs } from "@/lib/domain/search";
+import { withinMaxPrice, plansForGroup } from "@/lib/domain/pricing";
 import type { ClubSummary } from "@/lib/domain/types";
 
 const origin = { lat: 25.053, lng: 55.269, areaId: "ranches" };
 
 function club(i: number, overrides: Partial<ClubSummary> = {}): ClubSummary {
+  const lat = 25.053 + ((i * 37) % 11) * 0.004;
+  const lng = 55.269 + ((i * 13) % 7) * 0.004;
   return {
     id: `club-${String(i).padStart(2, "0")}`,
     slug: `club-${i}`,
@@ -12,13 +15,16 @@ function club(i: number, overrides: Partial<ClubSummary> = {}): ClubSummary {
     clubType: i % 2 ? "academy" : "community",
     areaId: "ranches",
     areaName: "Arabian Ranches",
-    lat: 25.053 + ((i * 37) % 11) * 0.004,
-    lng: 55.269 + ((i * 13) % 7) * 0.004,
+    lat,
+    lng,
     description: "",
     sports: ["football"],
     sessions: [
-      { id: `s${i}`, sportSlug: i % 3 ? "football" : "swimming", day: i % 7, start: "16:30", end: "17:30", ageMin: 5, ageMax: 12, priceAed: 50 + i * 5 },
+      { id: `s${i}`, sportSlug: i % 3 ? "football" : "swimming", day: i % 7, start: "16:30", end: "17:30", ageMin: 5, ageMax: 12, venueId: `v${i}`, groupId: `g${i}`, trialAvailable: false },
     ],
+    venues: [{ id: `v${i}`, name: "Main", areaId: "ranches", areaName: "Arabian Ranches", lat, lng }],
+    groups: [{ id: `g${i}`, venueId: `v${i}`, name: "", ageMin: 5, ageMax: 12, plans: [{ kind: "per_session", priceAed: 50 + i * 5, sessionsCount: null, label: "" }] }],
+    pricePlans: [],
     licenceVerified: i % 4 === 0,
     trialOffer: i % 5 === 0,
     featuredAreaIds: [],
@@ -109,8 +115,70 @@ describe("filters", () => {
     const byDay = rankClubs(base, origin, { day: 2 }).organic;
     expect(byDay.every((c) => c.matchingSessions.every((s) => s.day === 2))).toBe(true);
     const cheap = rankClubs(base, origin, { maxPriceAed: 60 }).organic;
-    expect(cheap.every((c) => c.matchingSessions.every((s) => s.priceAed <= 60))).toBe(true);
+    expect(cheap.length).toBeGreaterThan(0);
+    expect(cheap.every((c) => c.matchingSessions.some((s) => withinMaxPrice(plansForGroup(c, s.groupId), 60)))).toBe(true);
     const near = rankClubs(base, origin, { maxDistanceKm: 1 }).organic;
     expect(near.every((c) => c.distanceKm <= 1)).toBe(true);
+  });
+});
+
+describe("venues", () => {
+  const far = { lat: origin.lat + 0.2, lng: origin.lng };
+  const near = { lat: origin.lat + 0.01, lng: origin.lng };
+  const twoVenues = (overrides: Partial<ClubSummary> = {}) =>
+    club(1, {
+      lat: far.lat, lng: far.lng,
+      venues: [
+        { id: "far", name: "Far field", areaId: "springs", areaName: "The Springs", ...far },
+        { id: "near", name: "Near pitch", areaId: "ranches", areaName: "Arabian Ranches", ...near },
+      ],
+      groups: [
+        { id: "young", venueId: "near", name: "", ageMin: 5, ageMax: 7, plans: [] },
+        { id: "old", venueId: "far", name: "", ageMin: 10, ageMax: 12, plans: [] },
+      ],
+      sessions: [
+        { id: "a", sportSlug: "football", day: 1, start: "16:00", end: "17:00", ageMin: 5, ageMax: 7, venueId: "near", groupId: "young", trialAvailable: false },
+        { id: "b", sportSlug: "football", day: 3, start: "16:00", end: "17:00", ageMin: 10, ageMax: 12, venueId: "far", groupId: "old", trialAvailable: false },
+      ],
+      pricePlans: [{ kind: "per_session", priceAed: 40, sessionsCount: null, label: "" }],
+      ...overrides,
+    });
+
+  it("distance is to the nearest venue", () => {
+    const [c] = rankClubs([twoVenues()], origin).organic;
+    expect(c.nearestVenue?.id).toBe("near");
+    expect(c.distanceKm).toBeLessThan(2);
+  });
+
+  it("with a filter, only matching groups' venues count", () => {
+    const [c] = rankClubs([twoVenues()], origin, { childAge: 11 }).organic;
+    expect(c.nearestVenue?.id).toBe("far");
+    expect(c.distanceKm).toBeGreaterThan(20);
+  });
+
+  it("price filter uses each matching group's plans, falling back to club-wide", () => {
+    expect(rankClubs([twoVenues()], origin, { maxPriceAed: 45 }).organic).toHaveLength(1);
+    const pricey = twoVenues({
+      groups: [
+        { id: "young", venueId: "near", name: "", ageMin: 5, ageMax: 7, plans: [{ kind: "per_session", priceAed: 100, sessionsCount: null, label: "" }] },
+        { id: "old", venueId: "far", name: "", ageMin: 10, ageMax: 12, plans: [] },
+      ],
+    });
+    expect(rankClubs([pricey], origin, { maxPriceAed: 45, childAge: 6 }).organic).toHaveLength(0);
+    expect(rankClubs([pricey], origin, { maxPriceAed: 45, childAge: 11 }).organic).toHaveLength(1);
+  });
+
+  it("price filter never reorders", () => {
+    const base = Array.from({ length: 12 }, (_, i) => club(i));
+    const all = rankClubs(base, origin).organic.map((c) => c.id);
+    const kept = rankClubs(base, origin, { maxPriceAed: 80 }).organic.map((c) => c.id);
+    expect(kept.length).toBeLessThan(all.length);
+    expect(kept).toEqual(all.filter((id) => kept.includes(id)));
+  });
+
+  it("a club with no venues falls back to its own location", () => {
+    const [c] = rankClubs([club(2, { venues: [] })], origin).organic;
+    expect(c.nearestVenue).toBeNull();
+    expect(Number.isFinite(c.distanceKm)).toBe(true);
   });
 });

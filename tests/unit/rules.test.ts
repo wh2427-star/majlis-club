@@ -52,12 +52,13 @@ describe("facts", () => {
     expect(formatTime12("09:00")).toBe("9:00am");
     expect(formatTime12("12:15")).toBe("12:15pm");
   });
-  it("summarises sessions into ages, days and price", () => {
+  it("summarises sessions into ages and days", () => {
     const f = summariseSessions([
-      { id: "a", sportSlug: "swimming", day: 2, start: "16:30", end: "17:30", ageMin: 6, ageMax: 12, priceAed: 85 },
-      { id: "b", sportSlug: "swimming", day: 0, start: "16:30", end: "17:30", ageMin: 6, ageMax: 10, priceAed: 85 },
+      { id: "a", sportSlug: "swimming", day: 2, start: "16:30", end: "17:30", ageMin: 6, ageMax: 12, venueId: "v", groupId: "g", trialAvailable: false },
+      { id: "b", sportSlug: "swimming", day: 0, start: "16:30", end: "17:30", ageMin: 6, ageMax: 10, venueId: "v", groupId: "g", trialAvailable: false },
     ])!;
-    expect(f).toMatchObject({ ageMin: 6, ageMax: 12, priceMinAed: 85, priceMaxAed: 85 });
+    expect(f).toMatchObject({ ageMin: 6, ageMax: 12 });
+    expect(f).not.toHaveProperty("priceMinAed");
     expect(f.schedule.map((d) => d.day)).toEqual([0, 2]);
   });
 });
@@ -65,11 +66,11 @@ describe("facts", () => {
 describe("weekly view", () => {
   it("lays saved sessions out by day and time", () => {
     const week = buildWeek([
-      { clubId: "c1", clubName: "B club", sessions: [{ id: "1", sportSlug: "tennis", day: 1, start: "17:00", end: "18:00", ageMin: 6, ageMax: 9, priceAed: 70 }] },
-      { clubId: "c2", clubName: "A club", sessions: [{ id: "2", sportSlug: "football", day: 1, start: "16:00", end: "17:00", ageMin: 10, ageMax: 14, priceAed: 60 }] },
+      { clubId: "c1", clubName: "B club", sessions: [{ id: "1", sportSlug: "tennis", day: 1, start: "17:00", end: "18:00", ageMin: 6, ageMax: 9, venueId: "v", groupId: "g", trialAvailable: false }] },
+      { clubId: "c2", clubName: "A club", sessions: [{ id: "2", sportSlug: "football", day: 1, start: "16:00", end: "17:00", ageMin: 10, ageMax: 14, venueId: "v", groupId: "g", trialAvailable: false }] },
     ]);
     expect(week[1].map((e) => e.clubId)).toEqual(["c2", "c1"]);
-    expect(buildWeek([{ clubId: "c1", clubName: "x", sessions: [{ id: "1", sportSlug: "t", day: 1, start: "17:00", end: "18:00", ageMin: 6, ageMax: 9, priceAed: 1 }] }], [12])[1]).toEqual([]);
+    expect(buildWeek([{ clubId: "c1", clubName: "x", sessions: [{ id: "1", sportSlug: "t", day: 1, start: "17:00", end: "18:00", ageMin: 6, ageMax: 9, venueId: "v", groupId: "g", trialAvailable: false }] }], [12])[1]).toEqual([]);
   });
 });
 
