@@ -111,6 +111,11 @@ export const demoAccounts = {
 export const demoOwnedClub = "oryx-owls-football";
 export const demoOwnedClubQuiet = "camel-cove-cricket";
 
+/** Weekly profile views for the busy demo club, oldest week first (the dashboard chart). */
+export const demoWeeklyViews = [48, 62, 58, 74, 82, 94];
+/** Fictional parents who have saved the busy club, so "Parent saves" is a real count. */
+export const seedSaverCount = 64;
+
 export const waitlistSeed = [
   { area: "umm-suqeim", emails: ["waiting1.demo@example.com", "waiting2.demo@example.com", "waiting3.demo@example.com"] },
   { area: "jumeirah", emails: ["waiting4.demo@example.com", "waiting5.demo@example.com"] },

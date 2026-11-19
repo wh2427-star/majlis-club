@@ -15,10 +15,12 @@ export type ProfileData = {
   licenceVerified: boolean;
   trialOffer: boolean;
   typicalReplyDays: number;
+  coachCredentials?: string;
 };
 
 /**
- * The club profile in the order parents see it: facts, photos, description, then the enquiry button.
+ * The club profile in the order parents see it: facts, photos, description, coaches, then the enquiry button.
+ * Sections with nothing in them are left out rather than shown empty.
  * Shared by the public page and the club's listing editor (live preview), so clubs see
  * exactly what they are judged on.
  */
@@ -31,7 +33,8 @@ export function ClubProfile({
 }: {
   club: ProfileData;
   distanceKm?: number;
-  photos: ReactNode;
+  /** null when the club has no photos: the section is left out. */
+  photos: ReactNode | null;
   actions: ReactNode;
   headingLevel?: 1 | 2;
 }) {
@@ -64,18 +67,31 @@ export function ClubProfile({
         ) : null}
       </section>
 
-      <section aria-labelledby="photos-h" className="mt-5" data-section="photos">
-        <S id="photos-h" className="mb-2 text-xl font-semibold">{t("club.photosTitle")}</S>
-        {photos}
-      </section>
+      {photos ? (
+        <section aria-labelledby="photos-h" className="mt-5" data-section="photos">
+          <S id="photos-h" className="mb-2 text-xl font-semibold">{t("club.photosTitle")}</S>
+          {photos}
+        </section>
+      ) : null}
 
-      <section aria-labelledby="about-h" className="mt-5" data-section="description">
-        <S id="about-h" className="mb-2 text-xl font-semibold">{t("club.aboutTitle")}</S>
-        <p className="whitespace-pre-line">{club.description || t("club.noDescription")}</p>
-        <p className="mt-2 text-sm">{t("club.replyIn", { days: club.typicalReplyDays })}</p>
-      </section>
+      {club.description.trim() ? (
+        <section aria-labelledby="about-h" className="mt-5" data-section="description">
+          <S id="about-h" className="mb-2 text-xl font-semibold">{t("club.aboutTitle")}</S>
+          <p className="whitespace-pre-line">{club.description}</p>
+        </section>
+      ) : null}
 
-      <div className="mt-5" data-section="actions">{actions}</div>
+      {club.coachCredentials?.trim() ? (
+        <section aria-labelledby="coaches-h" className="mt-5" data-section="coaches">
+          <S id="coaches-h" className="mb-2 text-xl font-semibold">{t("club.coachesTitle")}</S>
+          <p>{club.coachCredentials}</p>
+        </section>
+      ) : null}
+
+      <div className="mt-5" data-section="actions">
+        <p className="mb-2 text-sm">{t("club.replyIn", { days: club.typicalReplyDays })}</p>
+        {actions}
+      </div>
     </article>
   );
 }

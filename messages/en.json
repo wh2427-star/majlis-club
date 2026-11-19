@@ -134,7 +134,7 @@
     "photosTitle": "Photos",
     "noPhotos": "This club has not added photos yet.",
     "aboutTitle": "About the club",
-    "noDescription": "The club has not written a description yet.",
+    "coachesTitle": "Coaches",
     "sendEnquiry": "Send enquiry",
     "saveClub": "Save club",
     "saved": "Saved",
@@ -237,6 +237,64 @@
     "checkEmail": "Account created. Check your email to confirm, then sign in.",
     "whyAccount": "You can browse without an account. You need one to send an enquiry or save clubs."
   },
+  "clubHome": {
+    "tabsLabel": "Club sections",
+    "tabDashboard": "Dashboard and Pro",
+    "tabListing": "List your club",
+    "switcher": "Your clubs",
+    "openClub": "Open club"
+  },
+  "dashboard": {
+    "title": "Club dashboard",
+    "intro": "Visibility is free for every club. Manage incoming parent demand for {name}.",
+    "live": "Free listing live",
+    "statsLabel": "Your numbers for the last 6 weeks",
+    "views": "Profile views",
+    "viewsChange": "{change}% this week",
+    "viewsNoChange": "No change this week",
+    "viewsFromZero": "New views this week, none the week before",
+    "manageLabel": "Manage your listing",
+    "saves": "Parent saves",
+    "savesNote": "Shortlisted",
+    "enquiries": "Enquiries",
+    "enquiriesNote": "Direct questions",
+    "chartTitle": "6-week profile views",
+    "chartNote": "{count, plural, one {# enquiry} other {# enquiries}}",
+    "chartSummary": "Profile views per week, oldest first: {values}.",
+    "chartWeek": "Week",
+    "chartViews": "Views",
+    "weekLabel": "W{n}",
+    "addClub": "Add another club"
+  },
+  "pro": {
+    "title": "Club Pro",
+    "aside": "Optional tools for handling demand",
+    "intro": "Built to handle the enquiries and trial bookings above. Never alters search order.",
+    "locked": "Locked · Pro",
+    "comingSoon": "Coming soon",
+    "tools": {
+      "inbox": { "title": "Enquiry inbox", "body": "Centralise parent questions from your profile in one reply thread." },
+      "trials": { "title": "Trial and waitlist manager", "body": "Approve trial requests, cap class sizes, and auto-fill cancellations." },
+      "registration": { "title": "Term registration and attendance", "body": "Track renewals and mark poolside or pitchside attendance on mobile." },
+      "payments": { "title": "Payments and term billing", "body": "Collect monthly or termly AED fees with automatic receipts." },
+      "messaging": { "title": "Parent messaging", "body": "Send weather updates, pitch changes, and term reminders." },
+      "campaigns": { "title": "Campaigns and offers", "body": "Publish offers in the Promoted strip. Labelled Promoted. Never changes search order." },
+      "analytics": { "title": "Analytics", "body": "See age-group demand, conversion from view to trial, and retention." },
+      "store": { "title": "Club store", "body": "Sell kit and uniforms to your parents." }
+    }
+  },
+  "strength": {
+    "title": "Profile strength",
+    "progress": "{done} of {total} done",
+    "items": {
+      "description": { "action": "Add a description", "nudge": "Parents want to know how you coach and what children learn." },
+      "coachCredentials": { "action": "Add coach credentials", "nudge": "Licences and first aid help parents choose with confidence." },
+      "ageGroups": { "action": "Choose the age groups you serve", "nudge": "So parents can see at a glance whether their child fits." },
+      "photos": { "action": "Add photos", "nudge": "Clubs with photos get more saves." },
+      "licence": { "action": "Send your licence", "nudge": "A verified licence shows a badge on your listing." },
+      "schedule": { "action": "Add your sessions", "nudge": "Days, times and prices are the first things parents look for." }
+    }
+  },
   "clubArea": {
     "title": "Your club",
     "intro": "Listing is free for every club, academy or community club, and always will be.",
@@ -279,6 +337,32 @@
     "price": "Price per session (AED)",
     "create": "Add club",
     "created": "Your club is added. We approve new listings by hand, usually within two working days."
+  },
+  "wizard": {
+    "stepsLabel": "Listing steps",
+    "step1": "1. Basics",
+    "step2": "2. Schedule & fee",
+    "step3": "3. Photos",
+    "step4": "4. Preview",
+    "name": "Club name",
+    "namePlaceholder": "e.g. Springs Rovers Junior FC",
+    "sport": "Sport",
+    "community": "Community",
+    "clubType": "Club type",
+    "ageGroups": "Age groups served",
+    "ageGroup": "{group} yrs",
+    "description": "Short description",
+    "descriptionPlaceholder": "Describe training approach and what children learn",
+    "coachCredentials": "Coach credentials",
+    "coachPlaceholder": "e.g. Level 2 licensed coach, First Aid certified",
+    "continueSchedule": "Continue to schedule and pricing",
+    "continuePhotos": "Continue to photos",
+    "continuePreview": "Continue to preview",
+    "backToDashboard": "Back to dashboard",
+    "basicsTitle": "Basics",
+    "scheduleTitle": "Schedule and fees",
+    "previewTitle": "Preview",
+    "previewIntro": "This is exactly what parents see."
   },
   "editor": {
     "title": "Edit {name}",
@@ -392,6 +476,9 @@
     "updateIdentified": "Update"
   },
   "errors": {
+    "ageGroups": "Choose at least one age group.",
+    "replyDays": "Choose between 1 and 14 days.",
+    "coachCredentials": "Keep coach credentials under 200 characters.",
     "invalid": "Check this field.",
     "email": "Enter a valid email address.",
     "name": "Enter your name.",

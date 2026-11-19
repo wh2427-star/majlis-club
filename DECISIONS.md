@@ -54,3 +54,12 @@ Items marked **[CONFIRM]** are deliberately not resolved in code.
 - **Where illustrations appear:** home sport picker ("Browse by sport", decorative because the sport name is the link text), results sport header (below the dots-divide motion), results empty state, waitlist page, family empty states (no saved clubs, no enquiries), add-your-club onboarding, demand view at zero views, and the style guide (all 36). Never on club profiles or cards.
 - **Results sport filter stays a select** inside the filters panel. Nine 160px illustrated chips would crowd a 360px screen; the illustrated picker is the home "Browse by sport" grid.
 - **Forms keep typed values** after a validation error (React resets forms after a form action by default).
+- **Club owners land on their own club.** `/` and `/club` send a club user to `/club/<id>`: their first approved club by membership date (the club they joined first), else their first club. A switcher reaches the others. `/club/[id]/demand` redirects to the dashboard.
+- **Club dashboard** shows six weeks of real counts (profile views, parent saves, enquiries) and a 6-week views chart with a hidden data table. The upgrade prompt still uses 30-day enquiries. Week-on-week change shows "No change" when last week had none, never a made-up percentage.
+- **Saves are a count only.** Clubs never read `saved_clubs`; `club_save_count(club)` returns the number to members and admins and null to everyone else.
+- **Seed parents.** The seed creates 64 fictional parents (`parent.seed.N@example.com`) who save the demo club, so "Parent saves" is a real count. They are reused across runs.
+- **Club Pro cards are always shown locked**, whatever `PAID_TOOLS_ENABLED` says, with no prices. A "Club store — coming soon" card sits with them.
+- **Empty profile sections are hidden** (photos, description, coaches) instead of showing "not written yet". The dashboard's profile-strength checklist nudges owners to fill them.
+- **Listing wizard.** Adding or editing a listing is four steps: Basics, Schedule & fee, Photos, Preview. A new club is created at step 1 with no sessions (it is pending until an admin approves it).
+- **Age groups (3-5, 6-8, 9-12, 13+) are club-level labels** for parents. Search and ranking never read them; session ages still drive the facts.
+- **Main sport** is `clubs.primary_sport_id`, chosen in step 1; a club's sports are its session sports plus its main sport.

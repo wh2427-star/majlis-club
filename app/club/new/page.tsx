@@ -6,7 +6,9 @@ import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { TextField } from "@/components/ui/Field";
 import { PageTitle, Section } from "@/components/ui/Misc";
-import { ClaimClubForm, CreateClubForm } from "@/components/forms/ClubForms";
+import { ClaimClubForm } from "@/components/forms/ClubForms";
+import { BasicsForm } from "@/components/forms/BasicsForm";
+import { ListingStepper } from "@/components/club/ListingStepper";
 import { Illustration } from "@/components/brand/Illustration";
 import { getAnyIllustration } from "@/lib/illustrations";
 
@@ -47,7 +49,8 @@ export default async function NewClubPage({ searchParams }: { searchParams: Prom
 
       <Section title={t("onboard.createTitle")} id="create">
         <Card>
-          <CreateClubForm
+          <ListingStepper current={1} />
+          <BasicsForm
             areas={areas.map((a) => ({ value: a.id, label: a.name }))}
             sports={sports.map((s) => ({ value: s.id, label: t(`sports.${s.slug}`) }))}
           />

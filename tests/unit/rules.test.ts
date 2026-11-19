@@ -3,6 +3,7 @@ import { captionNameWarning, coverage, isLicenceVerified, licenceState, shouldSh
 import { formatTime12, summariseSessions } from "@/lib/domain/facts";
 import { buildWeek } from "@/lib/domain/schedule";
 import { haversineKm } from "@/lib/domain/distance";
+import { basicsSchema } from "@/lib/schemas";
 
 describe("licence badge (rule 8)", () => {
   const today = "2026-11-18";
@@ -78,5 +79,38 @@ describe("distance", () => {
     const d = haversineKm({ lat: 25.053, lng: 55.269 }, { lat: 25.056, lng: 55.182 });
     expect(d).toBeGreaterThan(8.6);
     expect(d).toBeLessThan(8.9);
+  });
+});
+
+describe("basics schema (listing step 1)", () => {
+  const ok = {
+    name: "Springs Rovers Junior FC",
+    sportId: "8f14e45f-ceea-4e7a-9b1c-2d3e4f5a6b7c",
+    areaId: "1c4ca423-8a1e-4b2c-9d3e-5f6a7b8c9d0e",
+    clubType: "academy",
+    ageGroups: ["6-8", "9-12"],
+    description: "",
+    coachCredentials: "",
+  };
+  it("accepts the listed age groups", () => {
+    expect(basicsSchema.safeParse(ok).success).toBe(true);
+  });
+  it("needs at least one age group", () => {
+    expect(basicsSchema.safeParse({ ...ok, ageGroups: [] }).success).toBe(false);
+  });
+  it("rejects an age group that is not offered", () => {
+    expect(basicsSchema.safeParse({ ...ok, ageGroups: ["14-16"] }).success).toBe(false);
+  });
+  it("treats an empty reply-days field as the default of 3", () => {
+    const r = basicsSchema.safeParse({ ...ok, typicalReplyDays: "" });
+    expect(r.success && r.data.typicalReplyDays).toBe(3);
+  });
+  it("explains a reply-days value out of range", () => {
+    const r = basicsSchema.safeParse({ ...ok, typicalReplyDays: "15" });
+    expect(r.success).toBe(false);
+    expect(r.error?.issues[0].message).toBe("errors.replyDays");
+  });
+  it("caps coach credentials at 200 characters", () => {
+    expect(basicsSchema.safeParse({ ...ok, coachCredentials: "x".repeat(201) }).success).toBe(false);
   });
 });

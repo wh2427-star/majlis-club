@@ -23,6 +23,7 @@ export const getSports = cache(async (): Promise<Sport[]> => {
 type ClubRow = {
   id: string; slug: string; name: string; club_type: "academy" | "community"; area_id: string; lat: number; lng: number;
   description: string; typical_reply_days: number; status: string;
+  coach_credentials: string; age_groups: string[]; primary_sport_id: string | null;
   areas: { name: string } | null;
   club_sessions: { id: string; day: number; start_time: string; end_time: string; age_min: number; age_max: number; price_aed: number; sports: { slug: string } | null }[];
   club_sports: { sports: { slug: string } | null }[];
@@ -30,7 +31,7 @@ type ClubRow = {
 };
 
 const CLUB_SELECT =
-  "id, slug, name, club_type, area_id, lat, lng, description, typical_reply_days, status, areas(name), club_sessions(id, day, start_time, end_time, age_min, age_max, price_aed, sports(slug)), club_sports(sports(slug)), club_photos(id)";
+  "id, slug, name, club_type, area_id, lat, lng, description, typical_reply_days, status, coach_credentials, age_groups, primary_sport_id, areas(name), club_sessions(id, day, start_time, end_time, age_min, age_max, price_aed, sports(slug)), club_sports(sports(slug)), club_photos(id)";
 
 function toSession(s: ClubRow["club_sessions"][number]): Session {
   return {
@@ -47,7 +48,7 @@ function toSession(s: ClubRow["club_sessions"][number]): Session {
 
 type Badges = { licence_verified: boolean; trial_offer: boolean; featured_area_ids: string[] };
 
-export function toSummary(row: ClubRow, badges?: Badges): ClubSummary & { typicalReplyDays: number; status: string } {
+export function toSummary(row: ClubRow, badges?: Badges): ClubSummary & { typicalReplyDays: number; status: string; coachCredentials: string; ageGroups: string[]; primarySportId: string | null } {
   return {
     id: row.id,
     slug: row.slug,
@@ -66,6 +67,9 @@ export function toSummary(row: ClubRow, badges?: Badges): ClubSummary & { typica
     photoCount: row.club_photos.length,
     typicalReplyDays: row.typical_reply_days,
     status: row.status,
+    coachCredentials: row.coach_credentials ?? "",
+    ageGroups: row.age_groups ?? [],
+    primarySportId: row.primary_sport_id ?? null,
   };
 }
 
@@ -141,7 +145,12 @@ export async function getMyClubs() {
   const user = await getCurrentUser();
   if (!user) return [];
   const db = await createClient();
-  const { data, error } = await db.from("club_members").select("club_id, role, clubs(id, slug, name, status)").eq("user_id", user.id);
+  // Oldest membership first: the club an owner joined first is their main club.
+  const { data, error } = await db
+    .from("club_members")
+    .select("club_id, role, created_at, clubs(id, slug, name, status)")
+    .eq("user_id", user.id)
+    .order("created_at", { ascending: true });
   if (error) throw error;
   return (data as unknown as { club_id: string; role: string; clubs: { id: string; slug: string; name: string; status: string } }[]).map((m) => m.clubs);
 }

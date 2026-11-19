@@ -98,6 +98,12 @@ describe("parents", () => {
     expect(error).not.toBeNull();
   });
 
+  it("cannot read a club's save count", async () => {
+    const { data: club } = await parentA.c.from("clubs").select("id").eq("slug", "oryx-owls-football").single();
+    const { data } = await parentA.c.rpc("club_save_count", { p_club: club!.id });
+    expect(data ?? null).toBeNull();
+  });
+
   it("cannot make themselves an admin", async () => {
     await parentA.c.from("profiles").update({ role: "admin" }).eq("user_id", parentA.id);
     const { data } = await parentA.c.from("profiles").select("role").eq("user_id", parentA.id).single();
@@ -133,6 +139,32 @@ describe("club owners", () => {
       .eq("slug", "ghaf-tree-swim-squad")
       .select("id");
     expect(data ?? []).toEqual([]);
+  });
+
+  it("read the save count for their own club only", async () => {
+    const { data: mine } = await clubOwner.c.from("clubs").select("id").eq("slug", "oryx-owls-football").single();
+    const { data: other } = await clubOwner.c.from("clubs").select("id").eq("slug", "ghaf-tree-swim-squad").single();
+    const own = await clubOwner.c.rpc("club_save_count", { p_club: mine!.id });
+    expect(own.error).toBeNull();
+    expect(typeof own.data).toBe("number");
+    expect(own.data).toBeGreaterThanOrEqual(0);
+    const theirs = await clubOwner.c.rpc("club_save_count", { p_club: other!.id });
+    expect(theirs.data).toBeNull();
+  });
+
+  it("read six weekly view counts for their own club, matching the events, and none for other clubs", async () => {
+    const { data: mine } = await clubOwner.c.from("clubs").select("id").eq("slug", "oryx-owls-football").single();
+    const { data: other } = await clubOwner.c.from("clubs").select("id").eq("slug", "ghaf-tree-swim-squad").single();
+    const own = await clubOwner.c.rpc("club_weekly_views", { p_club: mine!.id });
+    expect(own.error).toBeNull();
+    const weeks = own.data as number[];
+    expect(weeks).toHaveLength(6);
+    const since = new Date(Date.now() - 42 * 864e5).toISOString();
+    const { count } = await clubOwner.c.from("club_events").select("id", { count: "exact", head: true })
+      .eq("club_id", mine!.id).eq("kind", "view").gte("created_at", since);
+    expect(weeks.reduce((a, b) => a + b, 0)).toBe(count);
+    const theirs = await clubOwner.c.rpc("club_weekly_views", { p_club: other!.id });
+    expect(theirs.data).toBeNull();
   });
 
   it("cannot read parents' private tables", async () => {

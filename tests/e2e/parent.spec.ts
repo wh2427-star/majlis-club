@@ -65,10 +65,10 @@ test("empty result shows what is listed nearby and invites a suggestion", async 
   await expect(page.getByText("Thanks. We will get in touch with the club.")).toBeVisible();
 });
 
-test("club profile: facts, then photos, then description, then the enquiry button", async ({ page }) => {
+test("club profile: facts, then photos, description and coaches, then the enquiry button", async ({ page }) => {
   await page.goto("/clubs/oryx-owls-football?area=arabian-ranches");
   const sections = await page.locator("[data-section]").evaluateAll((els) => els.map((e) => e.getAttribute("data-section")));
-  expect(sections).toEqual(["facts", "photos", "description", "actions"]);
+  expect(sections).toEqual(["facts", "photos", "description", "coaches", "actions"]);
   await expect(page.getByText("Licence verified")).toBeVisible();
   await expect(page.getByRole("button", { name: "Report this photo" }).first()).toBeVisible();
   for (const img of await page.locator("[data-section=photos] img").all()) {
@@ -126,4 +126,19 @@ test("reporting a photo hides it straight away", async ({ page }) => {
 test("signed-out visitors can browse but must sign in to enquire", async ({ page }) => {
   await page.goto("/enquire/oryx-owls-football");
   await expect(page).toHaveURL(/\/auth\/sign-in\?next=/);
+});
+
+test("empty profile sections are hidden", async ({ page }) => {
+  // Sandstone Dojo is seeded with no photos (and no test uploads to it).
+  await page.goto("/clubs/sandstone-dojo");
+  await expect(page.getByTestId("club-profile")).toBeVisible();
+  await expect(page.locator('[data-section="photos"]')).toHaveCount(0);
+  await expect(page.locator('[data-section="coaches"]')).toHaveCount(0);
+  // Camel Cove is seeded with no description (the club-admin photo test may add a photo to it).
+  await page.goto("/clubs/camel-cove-cricket");
+  await expect(page.getByTestId("club-profile")).toBeVisible();
+  await expect(page.locator('[data-section="description"]')).toHaveCount(0);
+  await page.goto("/clubs/oryx-owls-football");
+  await expect(page.locator('[data-section="coaches"]')).toContainText("Level 2");
+  await expect(page.locator('[data-section="photos"]')).toHaveCount(1);
 });

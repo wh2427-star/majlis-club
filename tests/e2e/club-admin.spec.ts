@@ -1,51 +1,140 @@
 import { expect, test } from "@playwright/test";
 import { signIn } from "./helpers";
 
+/** Club owners land on their main club; the switcher lists every club they manage, by id. */
 async function clubBase(page: import("@playwright/test").Page, name: string) {
   await page.goto("/club");
-  const card = page.getByRole("listitem").filter({ has: page.getByRole("heading", { name }) });
-  const href = await card.getByRole("link", { name: "Edit listing" }).getAttribute("href");
-  return href!.replace("/edit", "");
+  await page.waitForURL(/\/club\/[0-9a-f-]{36}$/);
+  const id = await page.getByLabel("Your clubs").locator("option", { hasText: name }).getAttribute("value");
+  return `/club/${id}`;
 }
 
-test("demand view: big plain numbers and the upgrade prompt when demand crosses the threshold", async ({ page }) => {
+test("club owner lands on their own club dashboard", async ({ page }) => {
+  await signIn(page, "club");
+  await page.goto("/");
+  // Two redirects (/ → /club → /club/<id>); allow a cold server the navigation timeout, not 5s.
+  await page.waitForURL(/\/club\/[0-9a-f-]{36}$/);
+  await expect(page.getByRole("heading", { level: 1, name: "Club dashboard" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Dashboard and Pro" })).toHaveAttribute("aria-current", "page");
+  await expect(page.getByLabel("Your clubs")).toHaveValue(/[0-9a-f-]{36}/);
+  await expect(page.getByLabel("Your clubs").locator("option:checked")).toHaveText("Oryx Owls Football");
+});
+
+test("switcher reaches the owner's second club", async ({ page }) => {
+  await signIn(page, "club");
+  await page.goto("/club");
+  await page.waitForURL(/\/club\/[0-9a-f-]{36}$/);
+  const here = page.url();
+  // Choosing does not navigate on its own (WCAG 3.2.2); the button does.
+  await page.getByLabel("Your clubs").selectOption({ label: "Camel Cove Cricket" });
+  await expect(page).toHaveURL(here);
+  await page.getByRole("button", { name: "Open club" }).click();
+  await expect(page.getByText(/Camel Cove Cricket\./)).toBeVisible();
+});
+
+test("a user with no clubs sees the add prompt, not a redirect", async ({ page }) => {
+  await signIn(page, "admin");
+  await page.goto("/club");
+  await expect(page).toHaveURL(/\/club$/);
+  await expect(page.getByRole("link", { name: "Add or claim a club" })).toBeVisible();
+});
+
+test("another club's dashboard is a 404", async ({ page }) => {
+  await signIn(page, "club");
+  const base = await clubBase(page, "Oryx Owls Football");
+  await page.getByRole("button", { name: "Sign out" }).click();
+  await signIn(page, "parent");
+  // Streaming (root loading.tsx) sends 200 before notFound() runs, so check the not-found page itself.
+  await page.goto(base);
+  await expect(page.getByRole("heading", { level: 1, name: "We could not find that page." })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Club dashboard" })).toHaveCount(0);
+});
+
+/** The number shown on a stat card. */
+async function stat(page: import("@playwright/test").Page, testId: string) {
+  return Number((await page.getByTestId(testId).getByTestId("stat-value").innerText()).replace(/\D/g, ""));
+}
+
+test("dashboard: real numbers, a 6-week chart and the upgrade prompt when demand crosses the threshold", async ({ page }) => {
   await signIn(page, "club");
   const busy = await clubBase(page, "Oryx Owls Football");
-  await page.goto(`${busy}/demand`);
-  const numbers = page.getByTestId("demand-numbers");
-  // 128 seeded views (plus any from other tests) and 11 seeded enquiries in the last 30 days.
-  const text = (await numbers.innerText()).replace(/\s+/g, " ");
-  const [views, enquiries] = text.match(/\d+/g)!.map(Number);
-  expect(views).toBeGreaterThanOrEqual(128);
-  expect(enquiries).toBe(11);
+  await page.goto(busy);
+  // 418 seeded views over six weeks (plus any from other tests), 64 seeded savers plus the demo parent, 11 enquiries.
+  expect(await stat(page, "stat-views")).toBeGreaterThanOrEqual(418);
+  expect(await stat(page, "stat-saves")).toBeGreaterThanOrEqual(64);
+  expect(await stat(page, "stat-enquiries")).toBe(11);
+  await expect(page.getByTestId("stat-views")).toContainText(/[+-]?\d+% this week|No change this week/);
+  const cells = await page.getByTestId("views-chart").locator("table td").allInnerTexts();
+  expect(cells.map(Number)).toHaveLength(6);
+  [48, 62, 58, 74, 82, 94].forEach((seeded, i) => expect(Number(cells[i])).toBeGreaterThanOrEqual(seeded));
   await expect(page.getByTestId("upgrade-prompt")).toBeVisible();
+  await expect(page.locator("body")).not.toContainText(/AED \d+/);
   await page.getByRole("link", { name: "See the paid tools" }).click();
   await expect(page.getByText("Paid tools are not available yet.")).toBeVisible();
-  await expect(page.locator("body")).not.toContainText(/AED \d+ a (month|year)/);
 });
 
 test("quiet club sees small numbers honestly, including zero, and no upgrade prompt", async ({ page }) => {
   await signIn(page, "club");
   const quiet = await clubBase(page, "Camel Cove Cricket");
-  await page.goto(`${quiet}/demand`);
-  const text = (await page.getByTestId("demand-numbers").innerText()).replace(/\s+/g, " ");
-  const [views, enquiries] = text.match(/\d+/g)!.map(Number);
+  await page.goto(quiet);
+  const views = await stat(page, "stat-views");
   expect(views).toBeGreaterThanOrEqual(3);
   expect(views).toBeLessThan(10);
-  expect(enquiries).toBe(0);
-  await expect(page.getByTestId("demand-numbers")).toContainText("enquiries");
+  expect(await stat(page, "stat-enquiries")).toBe(0);
+  await expect(page.getByTestId("stat-views")).not.toContainText(/NaN|Infinity/);
   await expect(page.getByTestId("upgrade-prompt")).toHaveCount(0);
+  await expect(page.getByTestId("profile-strength")).toContainText("Add a description");
+});
+
+test("old demand link redirects to the dashboard enquiries", async ({ page }) => {
+  await signIn(page, "club");
+  const base = await clubBase(page, "Oryx Owls Football");
+  await page.goto(`${base}/demand`);
+  await page.waitForURL((u) => u.pathname === base);
+  await expect(page.getByRole("heading", { name: "Enquiries", exact: true })).toBeVisible();
+});
+
+test("dashboard links to the licence and the live public page", async ({ page }) => {
+  await signIn(page, "club");
+  const base = await clubBase(page, "Oryx Owls Football");
+  await page.goto(base);
+  await expect(page.getByRole("link", { name: "Licence" })).toHaveAttribute("href", `${base}/licence`);
+  await expect(page.getByRole("link", { name: "See public page" })).toHaveAttribute("href", "/clubs/oryx-owls-football");
+});
+
+test("step 1 explains a bad reply-days value instead of doing nothing", async ({ page }) => {
+  await signIn(page, "club");
+  const base = await clubBase(page, "Camel Cove Cricket");
+  await page.goto(`${base}/edit`);
+  await page.getByLabel("Usually reply within (days)").fill("15");
+  await page.getByRole("button", { name: "Continue to schedule and pricing" }).click();
+  await expect(page.getByText("Choose between 1 and 14 days.")).toBeVisible();
+});
+
+test("Pro tools are locked and never priced", async ({ page }) => {
+  await signIn(page, "club");
+  await page.goto(await clubBase(page, "Oryx Owls Football"));
+  const pro = page.getByTestId("club-pro");
+  await expect(pro.getByText("Locked · Pro")).toHaveCount(7);
+  await expect(pro.getByText("Coming soon")).toHaveCount(1);
+  await expect(pro).toContainText("Never alters search order.");
+  // The payments card mentions "AED fees" (screenshot copy); no amounts or prices anywhere.
+  await expect(pro).not.toContainText(/AED\s*\d|\d+\s*AED|\$\s*\d|per month|a month/i);
 });
 
 test("listing editor shows a live preview in the parent's order", async ({ page }) => {
   await signIn(page, "club");
   const base = await clubBase(page, "Camel Cove Cricket");
-  await page.goto(`${base}/edit`);
+  await page.goto(`${base}/edit/schedule`);
   const preview = page.getByTestId("live-preview");
-  await page.getByLabel("Club name", { exact: true }).fill("Camel Cove Cricket Club");
-  await expect(preview.getByRole("heading", { name: "Camel Cove Cricket Club" })).toBeVisible();
+  await expect(preview.getByRole("heading", { name: "Camel Cove Cricket" })).toBeVisible();
+  await page.getByLabel("Youngest age").first().fill("8");
+  await expect(preview).toContainText("Ages 8");
+  // Same order as the public page; empty sections are left out, as parents would see them (Camel Cove has no description).
   const sections = await preview.locator("[data-section]").evaluateAll((els) => els.map((e) => e.getAttribute("data-section")));
-  expect(sections).toEqual(["facts", "photos", "description", "actions"]);
+  expect(sections[0]).toBe("facts");
+  expect(sections.at(-1)).toBe("actions");
+  expect(sections).not.toContain("description");
   await page.getByRole("button", { name: "Add session" }).click();
   await expect(page.getByTestId("session-editor")).toHaveCount(3);
 });
@@ -71,17 +160,55 @@ test("photo upload requires consent and alt text and warns about names in captio
   await expect(page.getByText("Photo added.")).toBeVisible();
 });
 
-test("a new club can be added in one short form and waits for approval", async ({ page }) => {
+test("club adds a listing through the four steps", async ({ page }) => {
   await signIn(page, "club");
   await page.goto("/club/new");
   await expect(page.getByRole("heading", { name: "Add your club" })).toBeVisible();
-  await page.getByLabel("Club name", { exact: true }).fill(`E2E Demo Netball ${Date.now() % 10000}`);
-  await page.getByLabel("Community club").check();
-  await page.getByLabel("Area").selectOption({ label: "The Meadows" });
-  await page.getByLabel("Sport").selectOption({ label: "Netball" });
-  await page.getByLabel("Price per session (AED)").fill("25");
-  await page.getByRole("button", { name: "Add club" }).click();
+  const stepper = page.getByRole("list", { name: "Listing steps" });
+  await expect(stepper.locator('[aria-current="step"]')).toHaveText("1. Basics");
+  const name = `E2E Demo Netball ${Date.now() % 10000}`;
+  await page.getByLabel("Club name", { exact: true }).fill(name);
+  await page.getByLabel("Sport", { exact: true }).selectOption({ label: "Netball" });
+  await page.getByLabel("Community", { exact: true }).selectOption({ label: "The Meadows" });
+  await page.getByLabel("Club type").selectOption({ label: "Community club" });
+  // Chips are labelled checkboxes; tap the visible pill as a parent would.
+  await page.getByText("6-8 yrs", { exact: true }).click();
+  await page.getByText("9-12 yrs", { exact: true }).click();
+  await expect(page.getByLabel("6-8 yrs")).toBeChecked();
+  await expect(page.getByLabel("3-5 yrs")).not.toBeChecked();
+  await page.getByLabel("Coach credentials").fill("Level 1 netball coach");
+  await page.getByRole("button", { name: "Continue to schedule and pricing" }).click();
+
+  await page.waitForURL(/\/club\/[0-9a-f-]{36}\/edit\/schedule\?created=1$/);
   await expect(page.getByText(/Your club is added. We approve new listings by hand/)).toBeVisible();
+  await expect(page.getByRole("list", { name: "Listing steps" }).getByRole("link", { name: "2. Schedule & fee" })).toHaveAttribute("aria-current", "step");
+  await page.getByRole("button", { name: "Add session" }).click();
+  await page.getByLabel("Price per session (AED)").fill("25");
+  await page.getByRole("button", { name: "Continue to photos" }).click();
+
+  await page.waitForURL(/\/photos$/);
+  await expect(page.getByRole("link", { name: "3. Photos" })).toHaveAttribute("aria-current", "step");
+  await page.getByRole("link", { name: "Continue to preview" }).click();
+
+  await page.waitForURL(/\/preview$/);
+  await expect(page.getByTestId("club-profile").getByRole("heading", { name })).toBeVisible();
+  await expect(page.getByTestId("club-profile")).toContainText("Netball");
+
+  // Changing the main sport in step 1 replaces it; the old one does not linger.
+  // With no sessions, the facts show the club's own sports, so a stale sport would show there.
+  await page.getByRole("link", { name: "2. Schedule & fee" }).click();
+  await page.getByRole("button", { name: "Remove session" }).click();
+  await page.getByRole("button", { name: "Continue to photos" }).click();
+  await page.waitForURL(/\/photos$/);
+  await page.getByRole("link", { name: "1. Basics" }).click();
+  await page.getByLabel("Sport", { exact: true }).selectOption({ label: "Basketball" });
+  await page.getByRole("button", { name: "Continue to schedule and pricing" }).click();
+  await page.waitForURL(/\/edit\/schedule$/);
+  await page.goto(page.url().replace("/edit/schedule", "/preview"));
+  await expect(page.getByTestId("club-profile").locator('[data-section="facts"]')).toContainText("Basketball");
+  await expect(page.getByTestId("club-profile").locator('[data-section="facts"]')).not.toContainText("Netball");
+  await page.getByRole("link", { name: "Back to dashboard" }).click();
+  await expect(page.getByRole("heading", { level: 1, name: "Club dashboard" })).toBeVisible();
 });
 
 test("admin approves a licence and the badge appears for parents; it is absent on expiry", async ({ page, browser }) => {

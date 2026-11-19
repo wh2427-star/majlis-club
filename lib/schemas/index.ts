@@ -59,12 +59,21 @@ export const sessionSchema = z
   .refine((s) => s.end > s.start, { message: "errors.endAfterStart", path: ["end"] })
   .refine((s) => s.ageMax >= s.ageMin, { message: "errors.ageRange", path: ["ageMax"] });
 
-export const clubListingSchema = z.object({
+export const ageGroupValues = ["3-5", "6-8", "9-12", "13+"] as const;
+
+/** Listing step 1. Age groups are labels for parents; they never affect search. */
+export const basicsSchema = z.object({
   name: trimmed(2, 80, "errors.clubName"),
-  clubType: z.enum(["academy", "community"], { message: "errors.clubType" }),
+  sportId: z.string().uuid("errors.sport"),
   areaId: z.string().uuid("errors.area"),
+  clubType: z.enum(["academy", "community"], { message: "errors.clubType" }),
+  ageGroups: z.array(z.enum(ageGroupValues, { message: "errors.ageGroups" })).min(1, "errors.ageGroups"),
   description: z.string().trim().max(1500, "errors.description").default(""),
-  typicalReplyDays: z.coerce.number().int().min(1).max(14).default(3),
+  coachCredentials: z.string().trim().max(200, "errors.coachCredentials").default(""),
+  typicalReplyDays: z.preprocess(
+    (v) => (v === "" || v === null || v === undefined ? 3 : v),
+    z.coerce.number({ message: "errors.replyDays" }).int("errors.replyDays").min(1, "errors.replyDays").max(14, "errors.replyDays"),
+  ),
 });
 
 export const photoSchema = z.object({

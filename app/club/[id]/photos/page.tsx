@@ -7,16 +7,19 @@ import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Notice, PageTitle, Section } from "@/components/ui/Misc";
 import { PhotoUploadForm } from "@/components/forms/ClubForms";
+import { ButtonLink } from "@/components/ui/Button";
+import { ListingStepper } from "@/components/club/ListingStepper";
 
 export const metadata = { title: "Photos" };
 
 export default async function PhotosPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const { club } = await requireClubAccess(id, `/club/${id}/photos`);
-  const [t, tc, photos] = await Promise.all([getTranslations("photos"), getTranslations("common"), getClubPhotos(id)]);
+  const [t, tc, tw, photos] = await Promise.all([getTranslations("photos"), getTranslations("common"), getTranslations("wizard"), getClubPhotos(id)]);
   const statusLabel = { visible: t("statusVisible"), under_review: t("statusUnderReview"), removed: t("statusRemoved") } as Record<string, string>;
   return (
     <>
+      <ListingStepper clubId={club.id} current={3} />
       <PageTitle>{t("title", { name: club.name })}</PageTitle>
       <Notice>{t("rules")}</Notice>
       <Section title={t("upload")} id="upload">
@@ -42,6 +45,7 @@ export default async function PhotosPage({ params }: { params: Promise<{ id: str
           ))}
         </ul>
       </Section>
+      <ButtonLink href={`/club/${club.id}/preview`} className="mt-6">{tw("continuePreview")}</ButtonLink>
     </>
   );
 }

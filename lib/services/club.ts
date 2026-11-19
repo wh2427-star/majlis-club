@@ -3,8 +3,9 @@ import { randomUUID } from "node:crypto";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getClubById, getCurrentUser, getMyClubs } from "@/lib/data/queries";
-import { clubListingSchema, fieldErrors, licenceSchema, photoSchema, sessionSchema } from "@/lib/schemas";
+import { basicsSchema, fieldErrors, licenceSchema, photoSchema, sessionSchema } from "@/lib/schemas";
 import { licenceState, shouldShowUpgradePrompt } from "@/lib/domain/rules";
+import { viewsTrend } from "@/lib/domain/dashboard";
 import { appConfig } from "@/config/app";
 import { isValidUploadPath, uploadRules, type UploadKind } from "@/lib/domain/uploads";
 import { requireUser } from "./family";
@@ -33,57 +34,49 @@ function slugify(name: string) {
   return `${base}-${randomUUID().slice(0, 6)}`;
 }
 
-/** Create a listing with its first session. New clubs start pending; an admin approves them. */
+function readBasics(form: FormData) {
+  return basicsSchema.safeParse({
+    name: form.get("name"),
+    sportId: form.get("sportId"),
+    areaId: form.get("areaId"),
+    clubType: form.get("clubType"),
+    ageGroups: form.getAll("ageGroups"),
+    description: form.get("description") ?? "",
+    coachCredentials: form.get("coachCredentials") ?? "",
+    typicalReplyDays: form.get("typicalReplyDays") ?? 3,
+  });
+}
+
+/** Listing step 1 for a new club. New clubs start pending; an admin approves them. Sessions come in step 2. */
 export async function createClub(form: FormData): Promise<ActionState & { id?: string }> {
   const user = await getCurrentUser();
   if (!user) return { ok: false, message: "errors.signInRequired" };
-  const listing = clubListingSchema.safeParse({
-    name: form.get("name"),
-    clubType: form.get("clubType"),
-    areaId: form.get("areaId"),
-    description: "",
-    typicalReplyDays: 3,
-  });
-  const session = sessionSchema.safeParse({
-    sportId: form.get("sportId"),
-    day: form.get("day"),
-    start: form.get("start"),
-    end: form.get("end"),
-    ageMin: form.get("ageMin"),
-    ageMax: form.get("ageMax"),
-    priceAed: form.get("priceAed"),
-  });
-  if (!listing.success || !session.success) {
-    return {
-      ok: false,
-      errors: { ...(listing.success ? {} : fieldErrors(listing.error)), ...(session.success ? {} : fieldErrors(session.error)) },
-    };
-  }
+  const parsed = readBasics(form);
+  if (!parsed.success) return { ok: false, errors: fieldErrors(parsed.error) };
+  const b = parsed.data;
   const db = await createClient();
-  const { data: area } = await db.from("areas").select("lat, lng").eq("id", listing.data.areaId).single();
+  const { data: area } = await db.from("areas").select("lat, lng").eq("id", b.areaId).single();
   if (!area) return { ok: false, errors: { areaId: "errors.area" } };
   const id = randomUUID();
   const { error } = await db.from("clubs").insert({
     id,
-    slug: slugify(listing.data.name),
-    name: listing.data.name,
-    club_type: listing.data.clubType,
-    area_id: listing.data.areaId,
+    slug: slugify(b.name),
+    name: b.name,
+    club_type: b.clubType,
+    area_id: b.areaId,
+    primary_sport_id: b.sportId,
+    age_groups: b.ageGroups,
+    description: b.description,
+    coach_credentials: b.coachCredentials,
+    typical_reply_days: b.typicalReplyDays,
     // Until a club sets its own location, it sits at its area's centre point.
     lat: area.lat,
     lng: area.lng,
     created_by: user.id,
   });
   if (error) return { ok: false, message: "errors.generic" };
-  const s = session.data;
-  const [a, b] = await Promise.all([
-    db.from("club_sports").insert({ club_id: id, sport_id: s.sportId }),
-    db.from("club_sessions").insert({
-      club_id: id, sport_id: s.sportId, day: s.day, start_time: s.start, end_time: s.end,
-      age_min: s.ageMin, age_max: s.ageMax, price_aed: s.priceAed,
-    }),
-  ]);
-  if (a.error || b.error) return { ok: false, message: "errors.generic" };
+  const { error: e2 } = await db.from("club_sports").insert({ club_id: id, sport_id: b.sportId });
+  if (e2) return { ok: false, message: "errors.generic" };
   return { ok: true, id };
 }
 
@@ -110,17 +103,33 @@ export async function claimClub(form: FormData): Promise<ActionState> {
   return { ok: true };
 }
 
-/** Save the listing editor: details and the full list of sessions. */
-export async function updateListing(clubId: string, form: FormData): Promise<ActionState> {
+/** Listing step 1 for an existing club. */
+export async function updateBasics(clubId: string, form: FormData): Promise<ActionState> {
   await requireClubAccess(clubId, `/club/${clubId}/edit`);
-  const listing = clubListingSchema.safeParse({
-    name: form.get("name"),
-    clubType: form.get("clubType"),
-    areaId: form.get("areaId"),
-    description: form.get("description") ?? "",
-    typicalReplyDays: form.get("typicalReplyDays"),
-  });
-  if (!listing.success) return { ok: false, errors: fieldErrors(listing.error) };
+  const parsed = readBasics(form);
+  if (!parsed.success) return { ok: false, errors: fieldErrors(parsed.error) };
+  const b = parsed.data;
+  const db = await createClient();
+  const { error } = await db
+    .from("clubs")
+    .update({
+      name: b.name, club_type: b.clubType, area_id: b.areaId, primary_sport_id: b.sportId, age_groups: b.ageGroups,
+      description: b.description, coach_credentials: b.coachCredentials, typical_reply_days: b.typicalReplyDays,
+    })
+    .eq("id", clubId);
+  if (error) return { ok: false, message: "errors.generic" };
+  // A club's sports are its session sports plus its main sport; a replaced main sport does not linger.
+  const { data: rows } = await db.from("club_sessions").select("sport_id").eq("club_id", clubId);
+  const sportIds = [...new Set([...(rows ?? []).map((r) => r.sport_id as string), b.sportId])];
+  const del = await db.from("club_sports").delete().eq("club_id", clubId);
+  const ins = await db.from("club_sports").insert(sportIds.map((sport_id) => ({ club_id: clubId, sport_id })));
+  if (del.error || ins.error) return { ok: false, message: "errors.generic" };
+  return { ok: true, message: "editor.savedChanges" };
+}
+
+/** Listing step 2: replace the full list of sessions. The club's sports are its session sports plus its main sport. */
+export async function updateSchedule(clubId: string, form: FormData): Promise<ActionState> {
+  const { club } = await requireClubAccess(clubId, `/club/${clubId}/edit/schedule`);
   let rawSessions: unknown[] = [];
   try {
     rawSessions = JSON.parse(String(form.get("sessions") ?? "[]"));
@@ -137,24 +146,18 @@ export async function updateListing(clubId: string, form: FormData): Promise<Act
     sessions.push(parsed.data);
   }
   const db = await createClient();
-  const l = listing.data;
-  const { error } = await db
-    .from("clubs")
-    .update({ name: l.name, club_type: l.clubType, area_id: l.areaId, description: l.description, typical_reply_days: l.typicalReplyDays })
-    .eq("id", clubId);
-  if (error) return { ok: false, message: "errors.generic" };
   await db.from("club_sessions").delete().eq("club_id", clubId);
   if (sessions.length) {
-    const { error: e2 } = await db.from("club_sessions").insert(
+    const { error } = await db.from("club_sessions").insert(
       sessions.map((s) => ({
         club_id: clubId, sport_id: s.sportId, day: s.day, start_time: s.start, end_time: s.end,
         age_min: s.ageMin, age_max: s.ageMax, price_aed: s.priceAed,
       })),
     );
-    if (e2) return { ok: false, message: "errors.generic" };
+    if (error) return { ok: false, message: "errors.generic" };
   }
   await db.from("club_sports").delete().eq("club_id", clubId);
-  const sportIds = [...new Set(sessions.map((s) => s.sportId))];
+  const sportIds = [...new Set([...sessions.map((s) => s.sportId), ...(club.primarySportId ? [club.primarySportId] : [])])];
   if (sportIds.length) await db.from("club_sports").insert(sportIds.map((sport_id) => ({ club_id: clubId, sport_id })));
   return { ok: true, message: "editor.savedChanges" };
 }
@@ -229,23 +232,27 @@ export async function getLicenceStatus(clubId: string) {
   return { state, verifiedUntil: verified?.expiresOn, rejectReason: rows[0]?.rejectReason ?? "" };
 }
 
-/** Demand view: plain counts, honest even when small. Upgrade prompt only when enquiries cross the threshold. */
-export async function getDemand(clubId: string) {
+export type EnquiryRow = {
+  id: string; contact_name: string; contact_email: string; contact_phone: string | null; child_nickname: string | null;
+  child_birth_year: number | null; message: string; status: "sent" | "seen" | "replied" | "closed"; created_at: string;
+};
+
+/** Club dashboard: six weeks of real counts, honest even when small. Upgrade prompt only when 30-day enquiries cross the threshold. */
+export async function getDashboard(clubId: string) {
   const db = await createClient();
-  const now = Date.now();
-  const d30 = new Date(now - 30 * 864e5).toISOString();
-  const d60 = new Date(now - 60 * 864e5).toISOString();
-  const count = async (kind: "view" | "enquiry", from: string, to?: string) => {
-    let q = db.from("club_events").select("id", { count: "exact", head: true }).eq("club_id", clubId).eq("kind", kind).gte("created_at", from);
-    if (to) q = q.lt("created_at", to);
-    const { count: c } = await q;
-    return c ?? 0;
+  const now = new Date();
+  const d42 = new Date(now.getTime() - 42 * 864e5).toISOString();
+  const d30 = new Date(now.getTime() - 30 * 864e5).toISOString();
+  const enquiryCount = async (from: string) => {
+    const { count } = await db.from("club_events").select("id", { count: "exact", head: true }).eq("club_id", clubId).eq("kind", "enquiry").gte("created_at", from);
+    return count ?? 0;
   };
-  const [views, enquiries, prevViews, prevEnquiries, list] = await Promise.all([
-    count("view", d30),
-    count("enquiry", d30),
-    count("view", d60, d30),
-    count("enquiry", d60, d30),
+  const [weekly, saves, enquiriesTotal, enquiries30, list] = await Promise.all([
+    // Counted in SQL: reading rows would be capped by the API's max rows and undercount busy clubs.
+    db.rpc("club_weekly_views", { p_club: clubId }),
+    db.rpc("club_save_count", { p_club: clubId }),
+    enquiryCount(d42),
+    enquiryCount(d30),
     db
       .from("enquiries")
       .select("id, contact_name, contact_email, contact_phone, child_nickname, child_birth_year, message, status, created_at")
@@ -253,18 +260,21 @@ export async function getDemand(clubId: string) {
       .order("created_at", { ascending: false })
       .limit(50),
   ]);
+  const weeks = (weekly.data as number[] | null) ?? [0, 0, 0, 0, 0, 0];
   return {
-    views,
-    enquiries,
-    prevViews,
-    prevEnquiries,
-    list: list.data ?? [],
-    showUpgrade: shouldShowUpgradePrompt(enquiries, appConfig.upgradeEnquiryThreshold),
+    weeks,
+    viewsTotal: weeks.reduce((a, b) => a + b, 0),
+    viewsTrend: viewsTrend(weeks[5], weeks[4]),
+    saves: (saves.data as number | null) ?? 0,
+    enquiriesTotal,
+    enquiries30,
+    showUpgrade: shouldShowUpgradePrompt(enquiries30, appConfig.upgradeEnquiryThreshold),
+    list: (list.data ?? []) as EnquiryRow[],
   };
 }
 
 export async function setEnquiryStatus(clubId: string, enquiryId: string, status: "seen" | "replied" | "closed") {
-  await requireClubAccess(clubId, `/club/${clubId}/demand`);
+  await requireClubAccess(clubId, `/club/${clubId}`);
   const db = await createClient();
   await db.from("enquiries").update({ status }).eq("id", enquiryId).eq("club_id", clubId);
 }

@@ -96,7 +96,7 @@ test("illustrations: family empty state (no saved clubs)", async ({ page }) => {
   await gates(page);
 });
 
-test("illustrations: onboarding, and the demand view at zero", async ({ page }) => {
+test("illustrations: onboarding, and the dashboard at zero views", async ({ page }) => {
   await signIn(page, "club");
   await page.goto("/club/new");
   await checkIllustrations(page);
@@ -106,16 +106,15 @@ test("illustrations: onboarding, and the demand view at zero", async ({ page }) 
   await page.setViewportSize({ width: 360, height: 780 });
   await page.goto("/club/new");
   await page.getByLabel("Club name", { exact: true }).fill(`E2E Zero Demand ${Date.now() % 10000}`);
-  await page.getByLabel("Community club").check();
-  await page.getByLabel("Area").selectOption({ label: "The Meadows" });
-  await page.getByLabel("Sport").selectOption({ label: "Swimming" });
-  await page.getByLabel("Price per session (AED)").fill("40");
-  await page.getByRole("button", { name: "Add club" }).click();
+  await page.getByLabel("Sport", { exact: true }).selectOption({ label: "Swimming" });
+  await page.getByLabel("Community", { exact: true }).selectOption({ label: "The Meadows" });
+  await page.getByLabel("Club type").selectOption({ label: "Community club" });
+  await page.getByText("6-8 yrs", { exact: true }).click();
+  await page.getByRole("button", { name: "Continue to schedule and pricing" }).click();
+  await page.waitForURL(/\/club\/[0-9a-f-]{36}\/edit\/schedule/);
   await expect(page.getByText(/Your club is added/)).toBeVisible();
-  await page.goto("/club");
-  const card = page.getByRole("listitem").filter({ hasText: "E2E Zero Demand" }).last();
-  const href = await card.getByRole("link", { name: "Edit listing" }).getAttribute("href");
-  await page.goto(href!.replace("/edit", "/demand"));
+  // The new club's dashboard is at zero views.
+  await page.goto(new URL(page.url()).pathname.replace("/edit/schedule", ""));
   await expect(page.getByTestId("illustrated-message")).toContainText("No parents have viewed your listing yet");
   await checkIllustrations(page);
   await gates(page);
