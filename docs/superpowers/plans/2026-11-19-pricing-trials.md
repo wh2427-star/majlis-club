@@ -145,7 +145,157 @@ Run `git commit -m "Add price-plan maths and schemas for plans, trial requests a
 
 ---
 
+## Revision 1 (2026-11-19, after Task 1): venues and per-group prices
+
+The user added a requirement mid-run: "a single club with multiple geographical locations for the same / different age groups / timings & costs per group". They chose to add venues now, with prices per group that fall back to club-wide prices. Tasks 2 and onward below replace the original Tasks 2–6. Task 1 stands as built.
+
+**Model:**
+- **Club** has many **venues**: name, area, lat/lng.
+- **Venue** has many **groups**: an optional name, plus an age range.
+- **Group** has many **sessions** (day, start, end, `trial_available`) and its own **price plans**.
+- **Club-wide plans** have `group_id` null.
+
+**Calls added:**
+10. **Which plans apply to a group:** its own plans when it has any; otherwise the club-wide plans.
+11. **Card distance** is to the nearest venue. While a sport, age or day filter is on, it uses only the venues of matching sessions. Order stays distance, then name.
+12. **The card's area fact** shows the nearest venue's area. The profile lists each venue with its groups, times and prices.
+13. **Session ages are copied from their group.** Sessions keep `age_min` and `age_max`, written only by `save_club_schedule` from the group's values, so the existing session-based search, week view and SQL keep working.
+14. **The schedule is saved atomically.** A security-invoker SQL function `save_club_schedule(p_club, p_payload jsonb)` replaces venues, groups, sessions and plans in one transaction, under RLS.
+15. **Migration backfill:**
+    - Each club gets one venue, named after its area, at the club's lat/lng.
+    - Each distinct (club, age range) gets one unnamed group.
+    - When a group has no name, it is displayed as "Ages 6 to 12".
+16. **Trial snapshots** also store the venue name, because venue ids change on every save.
+17. **Limits:**
+    - 5 venues per club, each name 1–80 characters.
+    - 10 groups per venue, each name up to 60 characters.
+    - 8 plans per group and 8 club-wide.
+
+**Review Focus additions:**
+6. **A club with a venue in another area** ranks by its nearest venue. With an age filter on, a club whose only matching group is at a far venue ranks by that far venue. *Covered by unit tests in Task 3.*
+7. **A schedule save that fails half-way** (for example, a bad plan in the last group) leaves the previous schedule intact. *Covered by an RLS test in Task 2: the RPC raises, and the old rows remain.*
+
+---
+
 ### Task 2: Database, seed and RLS
+
+**Files:**
+- Create: `supabase/migrations/20261119000003_venues_pricing_trials.sql`
+- Modify: `scripts/seed.ts`, `scripts/seed-data.ts`, `tests/rls/rls.test.ts`
+
+**Interfaces:**
+- Tables:
+  - `club_venues(id, club_id, name, area_id, lat, lng, sort, created_at)`
+  - `club_groups(id, club_id, venue_id, name default '', age_min, age_max, sort)`
+  - `club_sessions` gains `group_id not null` (after the backfill) and `trial_available bool default false`; `price_aed` becomes nullable.
+  - `club_price_plans(id, club_id, group_id null, kind, price_aed, sessions_count, label, sort)`
+  - `trial_requests(...)` as in the original Task 2, plus `venue_name text not null`.
+- RPC: `save_club_schedule(p_club uuid, p_payload jsonb) returns void`. The payload is `{ venues: [{ name, areaId, lat, lng, groups: [{ name, ageMin, ageMax, sessions: [{ sportId, day, start, end, trialAvailable }], plans: [PlanRow] }] }], plans: [PlanRow] }`, where `PlanRow = { kind, priceAed, sessionsCount, label }`.
+- Seed facts:
+  - Oryx Owls has 2 venues: "Ranches Community Pitch" (Arabian Ranches) and "Springs Park Field" (The Springs).
+  - The Ranches venue has group "Under 9s" (6–8, Mon 16:30, trial available) with plans `per_session 85` and `block 600 × 8`, and group "Under 13s" (9–12, Wed 16:30) with no own plans.
+  - The Springs venue has group "Juniors" (6–12, Sat 09:00) with plan `per_term 900 × 12`.
+  - Oryx's club-wide plan is `per_session 95`.
+  - Other clubs get one venue and one group per distinct age range. `trial: true` clubs have every session trial-available.
+  - The trial requests are as in the original plan.
+
+- [ ] **Step 1: Write the failing RLS tests.** Include all the original Task 2 tests, using Oryx's Monday trial session. Add:
+  - **"anyone reads venues and groups of approved clubs only".**
+  - **"owner saves a schedule through the RPC; another club's schedule is refused".** The RPC on Ghaf Tree errors.
+  - **"a bad plan aborts the whole save".** The payload's last group has a block of 12. The RPC errors, and Oryx's venue count and session count are unchanged.
+- [ ] **Step 2: Run them and watch them fail.**
+
+  Run: `npm run test:rls`. Expected: FAIL.
+- [ ] **Step 3: Write the migration.**
+  - Write the original Task 2 SQL, plus the venue and group tables with RLS: read when public, member or admin; write when member or admin.
+  - Add the grants as for plans.
+  - Backfill as described in call 15.
+  - Add `save_club_schedule`: plpgsql, `security invoker`, `search_path = ''`. It deletes the club's plans, sessions, groups and venues in that order, then inserts from the payload, and errors if the caller is not `is_club_member(p_club) or is_admin()`.
+  - Apply it with MCP.
+- [ ] **Step 4: Update the seed** with the facts above. Run `npm run seed`.
+- [ ] **Step 5: Run the tests and watch them pass.**
+
+  Run: `npm run test:rls`. Expected: PASS.
+- [ ] **Step 6: Commit.**
+
+---
+
+### Task 3: Domain and data layer: venues, groups, prices, nearest-venue distance
+
+**Files:**
+- Modify:
+  - `lib/domain/types.ts`, `lib/domain/search.ts`, `lib/domain/pricing.ts` (`plansForGroup`), `lib/domain/facts.ts`, `lib/data/queries.ts`
+  - Unit fixtures in `tests/unit/fair-order.test.ts` and `tests/unit/rules.test.ts`
+- Test: `tests/unit/fair-order.test.ts`, `tests/unit/pricing.test.ts`
+
+**Interfaces:**
+- `Venue = { id; name; areaId; areaName; lat; lng }`
+- `Group = { id; venueId; name; ageMin; ageMax; plans: PricePlan[] }`
+- `Session` drops `priceAed` and gains `venueId`, `groupId`, `trialAvailable`.
+- `ClubSummary` gains `venues: Venue[]`, `groups: Group[]` and `pricePlans: PricePlan[]` (club-wide).
+- `plansForGroup(club: Pick<ClubSummary, "groups" | "pricePlans">, groupId: string): PricePlan[]`
+- `RankedClub` gains `nearestVenue: Venue | null`.
+
+- [ ] **Step 1: Write the failing tests.**
+  - **"distance is to the nearest venue"** and **"with a filter, only matching groups' venues count"** (Review Focus 6).
+  - **"price filter uses each matching group's plans, falling back to club-wide"**.
+  - **"price filter never reorders"**.
+  - **`plansForGroup` fallback**.
+  - Update the fixtures.
+- [ ] **Step 2: Run them and watch them fail.**
+- [ ] **Step 3: Implement.**
+  - `rankClubs`: distance is the minimum haversine over the candidate venues, falling back to the club's lat/lng when there are no venues. The price filter checks `withinMaxPrice(plansForGroup(club, s.groupId), max)` over the matching sessions (all sessions when no filter is on). `summariseSessions` stops reading prices.
+  - `queries.ts` selects `club_venues(...)`, `club_groups(...)` and `club_price_plans(...)`, with sessions carrying `group_id` and `trial_available`. `trialOffer` is derived from `sessions.some(s => s.trialAvailable)`.
+- [ ] **Step 4: Run them and watch them pass.**
+
+  Run: `npx vitest run`. Expected: PASS, with `npm run typecheck` errors limited to the UI files that Task 4 updates.
+- [ ] **Step 5: Commit.**
+
+---
+
+### Task 4: Cards and profile show venues, groups, prices and trial buttons
+
+As the original Task 3's UI half:
+- **Card:**
+  - the price fact uses `cardPrice` over the matching groups' plans (`plansForGroup`);
+  - the area fact uses `nearestVenue.areaName`.
+- **Profile:**
+  - A `data-section="venues"` lists each venue (an `h2` with its name and area).
+  - Under each venue are its groups: the group name or "Ages {min} to {max}", the session rows each with `trialAction`, and a prices line from `plansForGroup` using `planText`.
+  - `data-section="prices"` shows the club-wide plans, titled "Prices at every venue", and is hidden when there are none.
+- **e2e tests:**
+  - **"Oryx card shows from AED 75 a session"**: the minimum is the Springs term at 900/12 = 75.
+  - **"the profile lists both venues, their groups and prices"**.
+  - **"Book a free trial only on the Under 9s Monday session"**.
+- **Commit message:** "Cards and profile: venues, groups, prices, trial buttons".
+
+### Task 5: Listing step 2 edits venues, groups, times, prices and trials
+
+As the original Task 4, with a nested editor:
+- The editor nests venues → groups → times and prices, plus a club-wide prices fieldset.
+- A venue's area select sets its lat/lng to the area centre; step 3 adds a map pin.
+- It posts one JSON field, `schedule`. A Zod `scheduleSchema` composes the venue, group, session and plan schemas with the limits from call 17; errors are keyed by path, e.g. `v0-g1-plan2-sessionsCount`.
+- `updateSchedule` validates and then calls `rpc("save_club_schedule")`.
+- **e2e tests:**
+  - **"add a second venue with a group and a term plan; preview shows it"**
+  - **"block of 12 refused with its message"**
+  - **"trial tick shows the button in preview"**
+  - **"profile strength asks for prices"** (counting club-wide and group plans)
+- **Commit message:** "Listing step 2: venues, groups, times, prices and free trials".
+
+### Task 6: Parents request a trial and see its status
+
+As the original Task 5. The snapshot also stores `venue_name`. The radio rows read "{group} at {venue} · {day} {time}".
+
+### Task 7: Clubs see, accept and decline trial requests
+
+As the original Task 6. Rows show the venue name. Run the full gate, record the decisions in `DECISIONS.md`, then commit.
+
+---
+
+## Appendix: original Tasks 2–6 (referenced by the revised tasks above as "original Task N")
+
+### Original Task 2: Database, seed and RLS
 
 **Files:**
 - Create: `supabase/migrations/20261119000003_pricing_trials.sql`
@@ -236,7 +386,7 @@ Run `git commit -m "Add price plans, trial sessions and trial requests with RLS;
 
 ---
 
-### Task 3: Prices and trials in the data layer, search and facts
+### Original Task 3: Prices and trials in the data layer, search and facts
 
 **Files:**
 - Modify:
@@ -298,7 +448,7 @@ Run `git commit -m "Read prices from plans: lowest per-session price on cards, e
 
 ---
 
-### Task 4: Listing step 2 edits plans and trial sessions
+### Original Task 4: Listing step 2 edits plans and trial sessions
 
 **Files:**
 - Modify:
@@ -352,7 +502,7 @@ Run `git commit -m "Listing step 2: price plans (session, term, year, block) and
 
 ---
 
-### Task 5: Parents request a trial and see its status
+### Original Task 5: Parents request a trial and see its status
 
 **Files:**
 - Create: `app/trial/[slug]/page.tsx`
@@ -419,7 +569,7 @@ Run `git commit -m "Parents request a free trial and follow its status in the fa
 
 ---
 
-### Task 6: Clubs see, accept and decline trial requests
+### Original Task 6: Clubs see, accept and decline trial requests
 
 **Files:**
 - Modify:
