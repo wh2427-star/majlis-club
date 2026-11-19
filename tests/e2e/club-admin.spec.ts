@@ -1,12 +1,50 @@
 import { expect, test } from "@playwright/test";
 import { signIn } from "./helpers";
 
+/** Club owners land on their main club; the switcher lists every club they manage, by id. */
 async function clubBase(page: import("@playwright/test").Page, name: string) {
   await page.goto("/club");
-  const card = page.getByRole("listitem").filter({ has: page.getByRole("heading", { name }) });
-  const href = await card.getByRole("link", { name: "Edit listing" }).getAttribute("href");
-  return href!.replace("/edit", "");
+  await page.waitForURL(/\/club\/[0-9a-f-]{36}$/);
+  const id = await page.getByLabel("Your clubs").locator("option", { hasText: name }).getAttribute("value");
+  return `/club/${id}`;
 }
+
+test("club owner lands on their own club dashboard", async ({ page }) => {
+  await signIn(page, "club");
+  await page.goto("/");
+  // Two redirects (/ → /club → /club/<id>); allow a cold server the navigation timeout, not 5s.
+  await page.waitForURL(/\/club\/[0-9a-f-]{36}$/);
+  await expect(page.getByRole("heading", { level: 1, name: "Club dashboard" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Dashboard and Pro" })).toHaveAttribute("aria-current", "page");
+  await expect(page.getByLabel("Your clubs")).toHaveValue(/[0-9a-f-]{36}/);
+  await expect(page.getByLabel("Your clubs").locator("option:checked")).toHaveText("Oryx Owls Football");
+});
+
+test("switcher reaches the owner's second club", async ({ page }) => {
+  await signIn(page, "club");
+  await page.goto("/club");
+  await page.waitForURL(/\/club\/[0-9a-f-]{36}$/);
+  await page.getByLabel("Your clubs").selectOption({ label: "Camel Cove Cricket" });
+  await expect(page.getByText(/Camel Cove Cricket\./)).toBeVisible();
+});
+
+test("a user with no clubs sees the add prompt, not a redirect", async ({ page }) => {
+  await signIn(page, "admin");
+  await page.goto("/club");
+  await expect(page).toHaveURL(/\/club$/);
+  await expect(page.getByRole("link", { name: "Add or claim a club" })).toBeVisible();
+});
+
+test("another club's dashboard is a 404", async ({ page }) => {
+  await signIn(page, "club");
+  const base = await clubBase(page, "Oryx Owls Football");
+  await page.getByRole("button", { name: "Sign out" }).click();
+  await signIn(page, "parent");
+  // Streaming (root loading.tsx) sends 200 before notFound() runs, so check the not-found page itself.
+  await page.goto(base);
+  await expect(page.getByRole("heading", { level: 1, name: "We could not find that page." })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Club dashboard" })).toHaveCount(0);
+});
 
 test("demand view: big plain numbers and the upgrade prompt when demand crosses the threshold", async ({ page }) => {
   await signIn(page, "club");

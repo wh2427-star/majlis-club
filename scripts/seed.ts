@@ -175,8 +175,9 @@ async function main() {
 
   // Demo club owner manages two clubs: one busy, one quiet.
   must(await db.from("club_members").upsert([
-    { club_id: clubIds[demoOwnedClub], user_id: ids.club, role: "owner" },
-    { club_id: clubIds[demoOwnedClubQuiet], user_id: ids.club, role: "owner" },
+    // The busy club is the owner's main club (joined first), so it is where they land.
+    { club_id: clubIds[demoOwnedClub], user_id: ids.club, role: "owner", created_at: daysAgo(90) },
+    { club_id: clubIds[demoOwnedClubQuiet], user_id: ids.club, role: "owner", created_at: daysAgo(30) },
   ]), "memberships");
 
   // Families

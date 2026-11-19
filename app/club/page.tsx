@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { getTranslations } from "next-intl/server";
 import { getCurrentUser, getMyClubs } from "@/lib/data/queries";
 import { ButtonLink } from "@/components/ui/Button";
@@ -21,6 +22,9 @@ export default async function ClubHome() {
       </>
     );
   const clubs = await getMyClubs();
+  // Owners land on their main club: the first approved one they joined, else the first they joined.
+  const main = clubs.find((c) => c.status === "approved") ?? clubs[0];
+  if (main) redirect(`/club/${main.id}`);
   const links = (id: string) => [
     [`/club/${id}/edit`, t("edit")],
     [`/club/${id}/photos`, t("photos")],

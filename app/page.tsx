@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { getTranslations } from "next-intl/server";
-import { getAreas, getSports } from "@/lib/data/queries";
+import { redirect } from "next/navigation";
+import { getAreas, getCurrentUser, getSports } from "@/lib/data/queries";
 import { Button, ButtonLink } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
@@ -11,6 +12,8 @@ import { DotsDivide } from "@/components/brand/DotsDivide";
 import { appConfig } from "@/config/app";
 
 export default async function Home() {
+  // Club owners start on their own club, not the parent search.
+  if ((await getCurrentUser())?.role === "club") redirect("/club");
   const [t, areas, sports] = await Promise.all([getTranslations(), getAreas(), getSports()]);
   const live = areas.filter((a) => a.status === "live");
   const soon = areas.filter((a) => a.status === "coming_soon");

@@ -237,6 +237,16 @@
     "checkEmail": "Account created. Check your email to confirm, then sign in.",
     "whyAccount": "You can browse without an account. You need one to send an enquiry or save clubs."
   },
+  "clubHome": {
+    "tabsLabel": "Club sections",
+    "tabDashboard": "Dashboard and Pro",
+    "tabListing": "List your club",
+    "switcher": "Your clubs"
+  },
+  "dashboard": {
+    "title": "Club dashboard",
+    "intro": "Visibility is free for every club. Manage incoming parent demand for {name}."
+  },
   "clubArea": {
     "title": "Your club",
     "intro": "Listing is free for every club, academy or community club, and always will be.",

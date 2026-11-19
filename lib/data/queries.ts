@@ -145,7 +145,12 @@ export async function getMyClubs() {
   const user = await getCurrentUser();
   if (!user) return [];
   const db = await createClient();
-  const { data, error } = await db.from("club_members").select("club_id, role, clubs(id, slug, name, status)").eq("user_id", user.id);
+  // Oldest membership first: the club an owner joined first is their main club.
+  const { data, error } = await db
+    .from("club_members")
+    .select("club_id, role, created_at, clubs(id, slug, name, status)")
+    .eq("user_id", user.id)
+    .order("created_at", { ascending: true });
   if (error) throw error;
   return (data as unknown as { club_id: string; role: string; clubs: { id: string; slug: string; name: string; status: string } }[]).map((m) => m.clubs);
 }
