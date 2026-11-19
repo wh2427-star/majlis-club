@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getClubById, getCurrentUser, getMyClubs } from "@/lib/data/queries";
-import { clubListingSchema, fieldErrors, licenceSchema, photoSchema, sessionSchema } from "@/lib/schemas";
+import { basicsSchema, fieldErrors, licenceSchema, photoSchema, sessionSchema } from "@/lib/schemas";
 import { licenceState, shouldShowUpgradePrompt } from "@/lib/domain/rules";
 import { weekChange, weeklyCounts } from "@/lib/domain/dashboard";
 import { appConfig } from "@/config/app";
@@ -34,57 +34,49 @@ function slugify(name: string) {
   return `${base}-${randomUUID().slice(0, 6)}`;
 }
 
-/** Create a listing with its first session. New clubs start pending; an admin approves them. */
+function readBasics(form: FormData) {
+  return basicsSchema.safeParse({
+    name: form.get("name"),
+    sportId: form.get("sportId"),
+    areaId: form.get("areaId"),
+    clubType: form.get("clubType"),
+    ageGroups: form.getAll("ageGroups"),
+    description: form.get("description") ?? "",
+    coachCredentials: form.get("coachCredentials") ?? "",
+    typicalReplyDays: form.get("typicalReplyDays") ?? 3,
+  });
+}
+
+/** Listing step 1 for a new club. New clubs start pending; an admin approves them. Sessions come in step 2. */
 export async function createClub(form: FormData): Promise<ActionState & { id?: string }> {
   const user = await getCurrentUser();
   if (!user) return { ok: false, message: "errors.signInRequired" };
-  const listing = clubListingSchema.safeParse({
-    name: form.get("name"),
-    clubType: form.get("clubType"),
-    areaId: form.get("areaId"),
-    description: "",
-    typicalReplyDays: 3,
-  });
-  const session = sessionSchema.safeParse({
-    sportId: form.get("sportId"),
-    day: form.get("day"),
-    start: form.get("start"),
-    end: form.get("end"),
-    ageMin: form.get("ageMin"),
-    ageMax: form.get("ageMax"),
-    priceAed: form.get("priceAed"),
-  });
-  if (!listing.success || !session.success) {
-    return {
-      ok: false,
-      errors: { ...(listing.success ? {} : fieldErrors(listing.error)), ...(session.success ? {} : fieldErrors(session.error)) },
-    };
-  }
+  const parsed = readBasics(form);
+  if (!parsed.success) return { ok: false, errors: fieldErrors(parsed.error) };
+  const b = parsed.data;
   const db = await createClient();
-  const { data: area } = await db.from("areas").select("lat, lng").eq("id", listing.data.areaId).single();
+  const { data: area } = await db.from("areas").select("lat, lng").eq("id", b.areaId).single();
   if (!area) return { ok: false, errors: { areaId: "errors.area" } };
   const id = randomUUID();
   const { error } = await db.from("clubs").insert({
     id,
-    slug: slugify(listing.data.name),
-    name: listing.data.name,
-    club_type: listing.data.clubType,
-    area_id: listing.data.areaId,
+    slug: slugify(b.name),
+    name: b.name,
+    club_type: b.clubType,
+    area_id: b.areaId,
+    primary_sport_id: b.sportId,
+    age_groups: b.ageGroups,
+    description: b.description,
+    coach_credentials: b.coachCredentials,
+    typical_reply_days: b.typicalReplyDays,
     // Until a club sets its own location, it sits at its area's centre point.
     lat: area.lat,
     lng: area.lng,
     created_by: user.id,
   });
   if (error) return { ok: false, message: "errors.generic" };
-  const s = session.data;
-  const [a, b] = await Promise.all([
-    db.from("club_sports").insert({ club_id: id, sport_id: s.sportId }),
-    db.from("club_sessions").insert({
-      club_id: id, sport_id: s.sportId, day: s.day, start_time: s.start, end_time: s.end,
-      age_min: s.ageMin, age_max: s.ageMax, price_aed: s.priceAed,
-    }),
-  ]);
-  if (a.error || b.error) return { ok: false, message: "errors.generic" };
+  const { error: e2 } = await db.from("club_sports").insert({ club_id: id, sport_id: b.sportId });
+  if (e2) return { ok: false, message: "errors.generic" };
   return { ok: true, id };
 }
 
@@ -111,17 +103,28 @@ export async function claimClub(form: FormData): Promise<ActionState> {
   return { ok: true };
 }
 
-/** Save the listing editor: details and the full list of sessions. */
-export async function updateListing(clubId: string, form: FormData): Promise<ActionState> {
+/** Listing step 1 for an existing club. */
+export async function updateBasics(clubId: string, form: FormData): Promise<ActionState> {
   await requireClubAccess(clubId, `/club/${clubId}/edit`);
-  const listing = clubListingSchema.safeParse({
-    name: form.get("name"),
-    clubType: form.get("clubType"),
-    areaId: form.get("areaId"),
-    description: form.get("description") ?? "",
-    typicalReplyDays: form.get("typicalReplyDays"),
-  });
-  if (!listing.success) return { ok: false, errors: fieldErrors(listing.error) };
+  const parsed = readBasics(form);
+  if (!parsed.success) return { ok: false, errors: fieldErrors(parsed.error) };
+  const b = parsed.data;
+  const db = await createClient();
+  const { error } = await db
+    .from("clubs")
+    .update({
+      name: b.name, club_type: b.clubType, area_id: b.areaId, primary_sport_id: b.sportId, age_groups: b.ageGroups,
+      description: b.description, coach_credentials: b.coachCredentials, typical_reply_days: b.typicalReplyDays,
+    })
+    .eq("id", clubId);
+  if (error) return { ok: false, message: "errors.generic" };
+  await db.from("club_sports").upsert({ club_id: clubId, sport_id: b.sportId }, { ignoreDuplicates: true });
+  return { ok: true, message: "editor.savedChanges" };
+}
+
+/** Listing step 2: replace the full list of sessions. The club's sports are its session sports plus its main sport. */
+export async function updateSchedule(clubId: string, form: FormData): Promise<ActionState> {
+  const { club } = await requireClubAccess(clubId, `/club/${clubId}/edit/schedule`);
   let rawSessions: unknown[] = [];
   try {
     rawSessions = JSON.parse(String(form.get("sessions") ?? "[]"));
@@ -138,24 +141,18 @@ export async function updateListing(clubId: string, form: FormData): Promise<Act
     sessions.push(parsed.data);
   }
   const db = await createClient();
-  const l = listing.data;
-  const { error } = await db
-    .from("clubs")
-    .update({ name: l.name, club_type: l.clubType, area_id: l.areaId, description: l.description, typical_reply_days: l.typicalReplyDays })
-    .eq("id", clubId);
-  if (error) return { ok: false, message: "errors.generic" };
   await db.from("club_sessions").delete().eq("club_id", clubId);
   if (sessions.length) {
-    const { error: e2 } = await db.from("club_sessions").insert(
+    const { error } = await db.from("club_sessions").insert(
       sessions.map((s) => ({
         club_id: clubId, sport_id: s.sportId, day: s.day, start_time: s.start, end_time: s.end,
         age_min: s.ageMin, age_max: s.ageMax, price_aed: s.priceAed,
       })),
     );
-    if (e2) return { ok: false, message: "errors.generic" };
+    if (error) return { ok: false, message: "errors.generic" };
   }
   await db.from("club_sports").delete().eq("club_id", clubId);
-  const sportIds = [...new Set(sessions.map((s) => s.sportId))];
+  const sportIds = [...new Set([...sessions.map((s) => s.sportId), ...(club.primarySportId ? [club.primarySportId] : [])])];
   if (sportIds.length) await db.from("club_sports").insert(sportIds.map((sport_id) => ({ club_id: clubId, sport_id })));
   return { ok: true, message: "editor.savedChanges" };
 }

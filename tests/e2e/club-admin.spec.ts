@@ -104,13 +104,16 @@ test("Pro tools are locked and never priced", async ({ page }) => {
 test("listing editor shows a live preview in the parent's order", async ({ page }) => {
   await signIn(page, "club");
   const base = await clubBase(page, "Camel Cove Cricket");
-  await page.goto(`${base}/edit`);
+  await page.goto(`${base}/edit/schedule`);
   const preview = page.getByTestId("live-preview");
-  await page.getByLabel("Club name", { exact: true }).fill("Camel Cove Cricket Club");
-  await expect(preview.getByRole("heading", { name: "Camel Cove Cricket Club" })).toBeVisible();
-  // Camel Cove has no description, so the preview leaves that section out, as parents would see it.
+  await expect(preview.getByRole("heading", { name: "Camel Cove Cricket" })).toBeVisible();
+  await page.getByLabel("Youngest age").first().fill("8");
+  await expect(preview).toContainText("Ages 8");
+  // Same order as the public page; empty sections are left out, as parents would see them (Camel Cove has no description).
   const sections = await preview.locator("[data-section]").evaluateAll((els) => els.map((e) => e.getAttribute("data-section")));
-  expect(sections).toEqual(["facts", "photos", "actions"]);
+  expect(sections[0]).toBe("facts");
+  expect(sections.at(-1)).toBe("actions");
+  expect(sections).not.toContain("description");
   await page.getByRole("button", { name: "Add session" }).click();
   await expect(page.getByTestId("session-editor")).toHaveCount(3);
 });
@@ -136,17 +139,41 @@ test("photo upload requires consent and alt text and warns about names in captio
   await expect(page.getByText("Photo added.")).toBeVisible();
 });
 
-test("a new club can be added in one short form and waits for approval", async ({ page }) => {
+test("club adds a listing through the four steps", async ({ page }) => {
   await signIn(page, "club");
   await page.goto("/club/new");
   await expect(page.getByRole("heading", { name: "Add your club" })).toBeVisible();
-  await page.getByLabel("Club name", { exact: true }).fill(`E2E Demo Netball ${Date.now() % 10000}`);
-  await page.getByLabel("Community club").check();
-  await page.getByLabel("Area").selectOption({ label: "The Meadows" });
-  await page.getByLabel("Sport").selectOption({ label: "Netball" });
-  await page.getByLabel("Price per session (AED)").fill("25");
-  await page.getByRole("button", { name: "Add club" }).click();
+  const stepper = page.getByRole("list", { name: "Listing steps" });
+  await expect(stepper.locator('[aria-current="step"]')).toHaveText("1. Basics");
+  const name = `E2E Demo Netball ${Date.now() % 10000}`;
+  await page.getByLabel("Club name", { exact: true }).fill(name);
+  await page.getByLabel("Sport", { exact: true }).selectOption({ label: "Netball" });
+  await page.getByLabel("Community", { exact: true }).selectOption({ label: "The Meadows" });
+  await page.getByLabel("Club type").selectOption({ label: "Community club" });
+  // Chips are labelled checkboxes; tap the visible pill as a parent would.
+  await page.getByText("6-8 yrs", { exact: true }).click();
+  await page.getByText("9-12 yrs", { exact: true }).click();
+  await expect(page.getByLabel("6-8 yrs")).toBeChecked();
+  await expect(page.getByLabel("3-5 yrs")).not.toBeChecked();
+  await page.getByLabel("Coach credentials").fill("Level 1 netball coach");
+  await page.getByRole("button", { name: "Continue to schedule and pricing" }).click();
+
+  await page.waitForURL(/\/club\/[0-9a-f-]{36}\/edit\/schedule\?created=1$/);
   await expect(page.getByText(/Your club is added. We approve new listings by hand/)).toBeVisible();
+  await expect(page.getByRole("list", { name: "Listing steps" }).getByRole("link", { name: "2. Schedule & fee" })).toHaveAttribute("aria-current", "step");
+  await page.getByRole("button", { name: "Add session" }).click();
+  await page.getByLabel("Price per session (AED)").fill("25");
+  await page.getByRole("button", { name: "Continue to photos" }).click();
+
+  await page.waitForURL(/\/photos$/);
+  await expect(page.getByRole("link", { name: "3. Photos" })).toHaveAttribute("aria-current", "step");
+  await page.getByRole("link", { name: "Continue to preview" }).click();
+
+  await page.waitForURL(/\/preview$/);
+  await expect(page.getByTestId("club-profile").getByRole("heading", { name })).toBeVisible();
+  await expect(page.getByTestId("club-profile")).toContainText("Netball");
+  await page.getByRole("link", { name: "Back to dashboard" }).click();
+  await expect(page.getByRole("heading", { level: 1, name: "Club dashboard" })).toBeVisible();
 });
 
 test("admin approves a licence and the badge appears for parents; it is absent on expiry", async ({ page, browser }) => {

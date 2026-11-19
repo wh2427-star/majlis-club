@@ -7,22 +7,35 @@ import type { ActionState } from "@/lib/services/public-actions";
 export async function createClubAction(_: ActionState, form: FormData): Promise<ActionState> {
   const res = await club.createClub(form);
   if (!res.ok || !res.id) return res;
-  redirect(`/club/${res.id}/edit?created=1`);
+  redirect(`/club/${res.id}/edit/schedule?created=1`);
 }
 
 export async function claimClubAction(_: ActionState, form: FormData) {
   return club.claimClub(form);
 }
 
-export async function updateListingAction(_: ActionState, form: FormData) {
+function revalidateListing(clubId: string) {
+  revalidatePath(`/club/${clubId}`, "layout");
+  revalidatePath("/clubs/[slug]", "page");
+  revalidatePath("/results");
+}
+
+/** Step 1 saved: go on to the schedule. */
+export async function updateBasicsAction(_: ActionState, form: FormData): Promise<ActionState> {
   const clubId = String(form.get("clubId") ?? "");
-  const res = await club.updateListing(clubId, form);
-  if (res.ok) {
-    revalidatePath(`/club/${clubId}/edit`);
-    revalidatePath("/clubs/[slug]", "page");
-    revalidatePath("/results");
-  }
-  return res;
+  const res = await club.updateBasics(clubId, form);
+  if (!res.ok) return res;
+  revalidateListing(clubId);
+  redirect(`/club/${clubId}/edit/schedule`);
+}
+
+/** Step 2 saved: go on to photos. */
+export async function updateScheduleAction(_: ActionState, form: FormData): Promise<ActionState> {
+  const clubId = String(form.get("clubId") ?? "");
+  const res = await club.updateSchedule(clubId, form);
+  if (!res.ok) return res;
+  revalidateListing(clubId);
+  redirect(`/club/${clubId}/photos`);
 }
 
 export async function uploadPhotoAction(_: ActionState, form: FormData) {
