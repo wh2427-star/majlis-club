@@ -45,7 +45,7 @@ export default async function ClubPage({ params, searchParams }: Props) {
     <ClubProfile
       club={club}
       distanceKm={distanceKm}
-      photos={<PhotoGallery photos={photos} signedIn={!!user} />}
+      photos={photos.length ? <PhotoGallery photos={photos} signedIn={!!user} /> : null}
       actions={actions}
     />
   );

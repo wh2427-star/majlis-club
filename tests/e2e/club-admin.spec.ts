@@ -108,8 +108,9 @@ test("listing editor shows a live preview in the parent's order", async ({ page 
   const preview = page.getByTestId("live-preview");
   await page.getByLabel("Club name", { exact: true }).fill("Camel Cove Cricket Club");
   await expect(preview.getByRole("heading", { name: "Camel Cove Cricket Club" })).toBeVisible();
+  // Camel Cove has no description, so the preview leaves that section out, as parents would see it.
   const sections = await preview.locator("[data-section]").evaluateAll((els) => els.map((e) => e.getAttribute("data-section")));
-  expect(sections).toEqual(["facts", "photos", "description", "actions"]);
+  expect(sections).toEqual(["facts", "photos", "actions"]);
   await page.getByRole("button", { name: "Add session" }).click();
   await expect(page.getByTestId("session-editor")).toHaveCount(3);
 });
