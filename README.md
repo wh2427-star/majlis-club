@@ -41,7 +41,7 @@ First Playwright run: `npx playwright install chromium`.
 | Path | What |
 | --- | --- |
 | `config/app.ts` | Product name (one place), feature flags, thresholds |
-| `lib/domain/` | Framework-free business rules: ranking, facts, licence, coverage, upgrade, schedule. Reusable by native apps |
+| `lib/domain/` | Framework-free business rules: ranking, facts, licence, coverage, upgrade, schedule, club dashboard maths (`dashboard.ts`). Reusable by native apps |
 | `lib/services/` | Server-only use cases (validate with Zod, call Supabase) |
 | `lib/schemas/` | Zod schemas shared by forms and server |
 | `app/actions/` | Thin server actions calling `lib/services` |
