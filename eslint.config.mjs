@@ -9,6 +9,8 @@ const eslintConfig = defineConfig([
   globalIgnores([
     // Default ignores of eslint-config-next:
     ".next/**",
+    // .next is a symlink to .next.nosync on iCloud-synced machines (iCloud skips *.nosync).
+    ".next.nosync/**",
     "out/**",
     "build/**",
     "next-env.d.ts",

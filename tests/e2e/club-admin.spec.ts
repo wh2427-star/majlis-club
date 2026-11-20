@@ -135,7 +135,8 @@ test("listing editor shows a live preview in the parent's order", async ({ page 
   expect(sections[0]).toBe("facts");
   expect(sections.at(-1)).toBe("actions");
   expect(sections).not.toContain("description");
-  await page.getByRole("button", { name: "Add session" }).click();
+  // Camel Cove's two age ranges became two groups, each with its own "Add session".
+  await page.getByRole("button", { name: "Add session" }).first().click();
   await expect(page.getByTestId("session-editor")).toHaveCount(3);
 });
 
@@ -183,7 +184,8 @@ test("club adds a listing through the four steps", async ({ page }) => {
   await expect(page.getByText(/Your club is added. We approve new listings by hand/)).toBeVisible();
   await expect(page.getByRole("list", { name: "Listing steps" }).getByRole("link", { name: "2. Schedule & fee" })).toHaveAttribute("aria-current", "step");
   await page.getByRole("button", { name: "Add session" }).click();
-  await page.getByLabel("Price per session (AED)").fill("25");
+  await page.getByRole("button", { name: "Add a price for every venue" }).click();
+  await page.getByLabel("Price (AED)").fill("25");
   await page.getByRole("button", { name: "Continue to photos" }).click();
 
   await page.waitForURL(/\/photos$/);
@@ -262,4 +264,146 @@ test("a large licence document uploads straight to storage, not through the app 
   await page.getByLabel("Licence document").setInputFiles({ name: "licence.pdf", mimeType: "application/pdf", buffer: pdf });
   await page.getByRole("button", { name: "Send licence" }).click();
   await expect(page.getByText("Licence sent. We will check it and email you.")).toBeVisible({ timeout: 30_000 });
+});
+
+/** A fresh club through step 1, landing on step 2 (schedule and prices). */
+async function newClub(page: import("@playwright/test").Page) {
+  await signIn(page, "club");
+  await page.goto("/club/new");
+  await page.getByLabel("Club name", { exact: true }).fill(`E2E Venues ${Date.now() % 100000}`);
+  await page.getByLabel("Sport", { exact: true }).selectOption({ label: "Football" });
+  await page.getByLabel("Community", { exact: true }).selectOption({ label: "Arabian Ranches" });
+  await page.getByLabel("Club type").selectOption({ label: "Community club" });
+  await page.getByText("6-8 yrs", { exact: true }).click();
+  await page.getByRole("button", { name: "Continue to schedule and pricing" }).click();
+  await page.waitForURL(/\/edit\/schedule\?created=1$/);
+  return page.url().replace(/\/edit\/schedule.*$/, "");
+}
+
+test("step 2 adds a second venue with a group and a term price; the preview shows it", async ({ page }) => {
+  const base = await newClub(page);
+  await page.getByRole("button", { name: "Add venue" }).click();
+  const second = page.getByRole("group", { name: "Venue 2" });
+  await second.getByLabel("Venue name").fill("North Hall");
+  await second.getByLabel("Venue area").selectOption({ label: "The Springs" });
+  await second.getByRole("button", { name: "Add session" }).click();
+  await second.getByRole("button", { name: "Add a price for this group" }).click();
+  await second.getByLabel("Charged").selectOption({ label: "Per term" });
+  await second.getByLabel("Price (AED)").fill("700");
+  await page.getByRole("button", { name: "Continue to photos" }).click();
+  await expect(second.getByText("Enter how many sessions the term has.")).toBeVisible();
+  await second.getByLabel("Sessions", { exact: true }).fill("10");
+  const preview = page.getByTestId("live-preview");
+  await expect(preview.locator("[data-section=venues]")).toContainText("North Hall");
+  await expect(preview.locator("[data-section=venues]")).toContainText("AED 700 a term (10 sessions)");
+  await page.getByRole("button", { name: "Continue to photos" }).click();
+  await page.waitForURL(/\/photos$/);
+  await page.goto(`${base}/preview`);
+  await expect(page.getByTestId("club-profile").locator("[data-section=venues]")).toContainText("North Hall · The Springs");
+  await expect(page.getByTestId("club-profile")).toContainText("AED 700 a term (10 sessions)");
+});
+
+test("a block outside 5 to 10 sessions is refused", async ({ page }) => {
+  await newClub(page);
+  await page.getByRole("button", { name: "Add session" }).click();
+  await page.getByRole("button", { name: "Add a price for every venue" }).click();
+  const prices = page.getByRole("group", { name: "Prices at every venue" });
+  await prices.getByLabel("Charged").selectOption({ label: "Block of sessions" });
+  await prices.getByLabel("Price (AED)").fill("450");
+  await prices.getByLabel("Sessions", { exact: true }).fill("12");
+  await page.getByRole("button", { name: "Continue to photos" }).click();
+  await expect(prices.getByText("A block is 5 to 10 sessions.")).toBeVisible();
+  await expect(page).toHaveURL(/\/edit\/schedule/);
+});
+
+test("ticking 'Offer a free trial session' adds the trial button to the preview", async ({ page }) => {
+  await newClub(page);
+  await page.getByRole("button", { name: "Add session" }).click();
+  const preview = page.getByTestId("live-preview");
+  await expect(preview.getByRole("button", { name: "Book a free trial" })).toHaveCount(0);
+  await page.getByLabel("Offer a free trial session").check();
+  await expect(preview.getByRole("button", { name: "Book a free trial" })).toBeDisabled();
+});
+
+test("profile strength asks for prices until a price exists", async ({ page }) => {
+  const base = await newClub(page);
+  await page.goto(base);
+  await expect(page.getByTestId("profile-strength")).toContainText("Add your prices");
+  await page.goto(`${base}/edit/schedule`);
+  await page.getByRole("button", { name: "Add session" }).click();
+  await page.getByRole("button", { name: "Add a price for every venue" }).click();
+  await page.getByLabel("Price (AED)").fill("60");
+  await page.getByRole("button", { name: "Continue to photos" }).click();
+  await page.waitForURL(/\/photos$/);
+  await page.goto(base);
+  await expect(page.getByTestId("profile-strength")).not.toContainText("Add your prices");
+});
+
+test("saving the schedule keeps venues where they were", async ({ page }) => {
+  await signIn(page, "club");
+  const base = await clubBase(page, "Oryx Owls Football");
+  await page.goto(`${base}/edit/schedule`);
+  await page.getByRole("button", { name: "Continue to photos" }).click();
+  await page.waitForURL(/\/photos$/);
+  await page.goto("/results?area=the-springs");
+  const card = page.locator("[data-testid=club-card]", { hasText: "Oryx Owls Football" });
+  await expect(card.locator("[data-fact=area] dd")).toHaveText("The Springs");
+  await expect(card.locator("[data-fact=price] dd")).toHaveText("from AED 75 a session");
+});
+
+test("dashboard counts trial requests and lists them, with accept and decline only while waiting", async ({ page }) => {
+  await signIn(page, "club");
+  await page.goto(await clubBase(page, "Oryx Owls Football"));
+  await expect(page.getByTestId("stat-trials").getByTestId("stat-value")).toHaveText(/^[3-9]|\d\d+$/);
+  const trials = page.getByRole("region", { name: "Trial requests" });
+  // Kit's request (a seeded parent) stays waiting; another test accepts Bean's.
+  const waiting = trials.getByRole("listitem").filter({ hasText: "Kit" });
+  await expect(waiting).toContainText("Ranches Community Pitch");
+  await expect(waiting.getByRole("button", { name: "Accept" })).toBeVisible();
+  await expect(waiting.getByRole("button", { name: "Decline" })).toBeVisible();
+  const accepted = trials.getByRole("listitem").filter({ hasText: "Rae" });
+  await expect(accepted).toContainText("Accepted");
+  await expect(accepted.getByRole("button")).toHaveCount(0);
+});
+
+test("club accepts a trial request and the parent sees it accepted", async ({ page }) => {
+  await signIn(page, "club");
+  await page.goto(await clubBase(page, "Oryx Owls Football"));
+  const bean = page.getByRole("region", { name: "Trial requests" }).getByRole("listitem").filter({ hasText: "Bean" });
+  await bean.getByRole("button", { name: "Accept" }).click();
+  await expect(bean).toContainText("Accepted");
+  await expect(bean.getByRole("button")).toHaveCount(0);
+  await page.context().clearCookies();
+  await signIn(page, "parent");
+  await page.goto("/family");
+  await expect(page.getByRole("region", { name: "Trial requests" })).toContainText("Accepted");
+});
+
+test("trial requests survive a schedule save", async ({ page }) => {
+  await signIn(page, "club");
+  const base = await clubBase(page, "Oryx Owls Football");
+  await page.goto(base);
+  const before = await page.getByRole("region", { name: "Trial requests" }).getByRole("listitem").count();
+  await page.goto(`${base}/edit/schedule`);
+  await page.getByRole("button", { name: "Continue to photos" }).click();
+  await page.waitForURL(/\/photos$/);
+  await page.goto(base);
+  await expect(page.getByRole("region", { name: "Trial requests" }).getByRole("listitem")).toHaveCount(before);
+  await expect(page.getByRole("region", { name: "Trial requests" })).toContainText("Ranches Community Pitch");
+});
+
+test("the Pro trials card no longer says approving trials is locked", async ({ page }) => {
+  await signIn(page, "club");
+  await page.goto(await clubBase(page, "Oryx Owls Football"));
+  await expect(page.getByTestId("club-pro")).not.toContainText("Approve trial requests");
+});
+
+test("a schedule that cannot be saved says so next to the save button", async ({ page }) => {
+  await newClub(page);
+  await page.getByRole("button", { name: "Add session" }).click();
+  await page.getByRole("button", { name: "Add a price for every venue" }).click();
+  // Price left empty.
+  await page.getByRole("button", { name: "Continue to photos" }).click();
+  await expect(page.getByRole("status").filter({ hasText: "Some details need fixing. Check the highlighted fields above." })).toBeVisible();
+  await expect(page).toHaveURL(/\/edit\/schedule/);
 });

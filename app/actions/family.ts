@@ -11,6 +11,13 @@ export async function sendEnquiryAction(_: ActionState, form: FormData): Promise
   redirect(`/enquire/sent/${res.id}`);
 }
 
+export async function requestTrialAction(_: ActionState, form: FormData): Promise<ActionState> {
+  const res = await family.requestTrial(form);
+  if (!res.ok) return res;
+  revalidatePath("/family");
+  redirect("/family#trials");
+}
+
 export async function addChildAction(_: ActionState, form: FormData) {
   const res = await family.addChild(form);
   if (res.ok) revalidatePath("/family");

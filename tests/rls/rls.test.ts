@@ -45,7 +45,7 @@ beforeAll(async () => {
 });
 
 describe("unauthenticated visitor", () => {
-  it.each(["parents", "children", "enquiries", "saved_clubs", "profiles", "licences", "club_events", "waitlist", "photo_reports", "club_members", "club_claims", "club_suggestions"])(
+  it.each(["parents", "children", "enquiries", "saved_clubs", "profiles", "licences", "club_events", "waitlist", "photo_reports", "club_members", "club_claims", "club_suggestions", "trial_requests"])(
     "cannot read %s",
     async (table) => {
       expect(await rowsVisible(anon, table)).toBe(0);
@@ -170,6 +170,136 @@ describe("club owners", () => {
   it("cannot read parents' private tables", async () => {
     expect(await rowsVisible(clubOwner.c, "parents", ["user_id", parentA.id])).toBe(0);
     expect(await rowsVisible(clubOwner.c, "children", ["parent_id", parentA.id])).toBe(0);
+  });
+});
+
+const ymd = (offset: number) => new Date(Date.now() + offset * 864e5).toISOString().slice(0, 10);
+
+async function oryxSessions(c: SupabaseClient) {
+  const { data: club } = await c.from("clubs").select("id").eq("slug", "oryx-owls-football").single();
+  const { data } = await c.from("club_sessions").select("id, day, trial_available, sport_id").eq("club_id", club!.id);
+  return { clubId: club!.id as string, trial: data!.find((s) => s.trial_available)!, plain: data!.find((s) => !s.trial_available)! };
+}
+
+function trialRow(clubId: string, s: { id: string; sport_id: string; day: number }, parentId: string, date = ymd(1)) {
+  return {
+    club_id: clubId, session_id: s.id, parent_id: parentId, child_nickname: "Zed", child_birth_year: 2017,
+    contact_name: "Test Parent", contact_email: "rls-test@example.com", contact_consent_at: new Date().toISOString(),
+    sport_id: s.sport_id, session_day: s.day, session_start: "16:30", venue_name: "Test venue", preferred_date: date,
+  };
+}
+
+describe("venues, price plans and trials", () => {
+  it("anyone reads venues, groups and plans of approved clubs; nothing of a pending club", async () => {
+    for (const table of ["club_venues", "club_groups", "club_price_plans"]) {
+      const { data } = await anon.from(table).select("club_id");
+      expect(data!.length, table).toBeGreaterThan(0);
+      const { data: pending } = await anon.from("clubs").select("id").eq("slug", "mirage-martial-arts").maybeSingle();
+      expect(pending).toBeNull();
+    }
+    const { data: mirage } = await clubOwner.c.from("clubs").select("id").eq("slug", "mirage-martial-arts").single();
+    for (const table of ["club_venues", "club_groups", "club_price_plans"]) {
+      expect(await rowsVisible(anon, table, ["club_id", mirage!.id]), table).toBe(0);
+    }
+  });
+
+  it("club owner writes own plans only", async () => {
+    const { clubId } = await oryxSessions(clubOwner.c);
+    const mine = await clubOwner.c.from("club_price_plans").insert({ club_id: clubId, kind: "per_year", price_aed: 3000 }).select("id").single();
+    expect(mine.error).toBeNull();
+    await clubOwner.c.from("club_price_plans").delete().eq("id", mine.data!.id);
+    const { data: other } = await clubOwner.c.from("clubs").select("id").eq("slug", "ghaf-tree-swim-squad").single();
+    const theirs = await clubOwner.c.from("club_price_plans").insert({ club_id: other!.id, kind: "per_year", price_aed: 1 });
+    expect(theirs.error).not.toBeNull();
+  });
+
+  it("database rejects a block of 4 and a term without sessions", async () => {
+    const { clubId } = await oryxSessions(clubOwner.c);
+    expect((await clubOwner.c.from("club_price_plans").insert({ club_id: clubId, kind: "block", price_aed: 100, sessions_count: 4 })).error).not.toBeNull();
+    expect((await clubOwner.c.from("club_price_plans").insert({ club_id: clubId, kind: "per_term", price_aed: 100 })).error).not.toBeNull();
+  });
+
+  it("parent requests a trial on a trial session, once", async () => {
+    const { clubId, trial } = await oryxSessions(parentB.c);
+    const first = await parentB.c.from("trial_requests").insert(trialRow(clubId, trial, parentB.id)).select("id, status").single();
+    expect(first.error).toBeNull();
+    expect(first.data!.status).toBe("requested");
+    const again = await parentB.c.from("trial_requests").insert(trialRow(clubId, trial, parentB.id));
+    expect(again.error?.code).toBe("23505");
+    const declined = await clubOwner.c.from("trial_requests").update({ status: "declined" }).eq("id", first.data!.id);
+    expect(declined.error).toBeNull();
+  });
+
+  it("parent cannot request a non-trial session, for another parent, for a past date or at a pending club", async () => {
+    const { clubId, trial, plain } = await oryxSessions(parentA.c);
+    expect((await parentA.c.from("trial_requests").insert(trialRow(clubId, plain, parentA.id))).error).not.toBeNull();
+    expect((await parentA.c.from("trial_requests").insert(trialRow(clubId, trial, parentB.id))).error).not.toBeNull();
+    expect((await parentA.c.from("trial_requests").insert(trialRow(clubId, trial, parentA.id, ymd(-1)))).error).not.toBeNull();
+    const { data: mirage } = await clubOwner.c.from("clubs").select("id").eq("slug", "mirage-martial-arts").single();
+    const { data: ms } = await clubOwner.c.from("club_sessions").select("id, day, sport_id").eq("club_id", mirage!.id).limit(1).single();
+    expect((await parentA.c.from("trial_requests").insert(trialRow(mirage!.id, ms!, parentA.id))).error).not.toBeNull();
+  });
+
+  it("parent cannot accept their own request; club cannot rewrite it", async () => {
+    const { data: own } = await parentA.c.from("trial_requests").select("id, status").eq("status", "requested").limit(1).single();
+    await parentA.c.from("trial_requests").update({ status: "accepted" }).eq("id", own!.id);
+    const { data: after } = await parentA.c.from("trial_requests").select("status").eq("id", own!.id).single();
+    expect(after!.status).toBe("requested");
+    expect((await clubOwner.c.from("trial_requests").update({ child_nickname: "Changed" }).eq("id", own!.id)).error).not.toBeNull();
+  });
+
+  it("club reads only its own requests and never the children table", async () => {
+    const { data: mine } = await clubOwner.c.from("club_members").select("club_id");
+    const myClubs = new Set(mine!.map((m) => m.club_id));
+    const { data } = await clubOwner.c.from("trial_requests").select("club_id");
+    expect(data!.length).toBeGreaterThan(0);
+    expect(data!.every((r) => myClubs.has(r.club_id))).toBe(true);
+    expect(await rowsVisible(clubOwner.c, "children", ["parent_id", parentA.id])).toBe(0);
+  });
+
+  it("owner saves a schedule through the RPC; another club's schedule is refused", async () => {
+    const { data: other } = await clubOwner.c.from("clubs").select("id").eq("slug", "ghaf-tree-swim-squad").single();
+    const { error } = await clubOwner.c.rpc("save_club_schedule", { p_club: other!.id, p_payload: { venues: [], plans: [] } });
+    expect(error).not.toBeNull();
+  });
+
+  it("a saved venue sits at its area's centre, whatever coordinates the caller sends", async () => {
+    // The pending club: no browser test depends on its schedule.
+    const { data: club } = await clubOwner.c.from("clubs").select("id").eq("slug", "mirage-martial-arts").single();
+    const { data: area } = await clubOwner.c.from("areas").select("id, lat, lng").eq("slug", "the-springs").single();
+    const { data: sport } = await clubOwner.c.from("sports").select("id").eq("slug", "martial-arts").single();
+    const { error } = await clubOwner.c.rpc("save_club_schedule", {
+      p_club: club!.id,
+      p_payload: {
+        plans: [{ kind: "per_session", priceAed: 70, sessionsCount: null, label: "" }],
+        venues: [{ name: "Far away", areaId: area!.id, lat: 1, lng: 1, groups: [
+          { name: "", ageMin: 6, ageMax: 14, sessions: [{ sportId: sport!.id, day: 2, start: "17:00", end: "18:00", trialAvailable: false }], plans: [] },
+        ] }],
+      },
+    });
+    expect(error).toBeNull();
+    const { data: venue } = await clubOwner.c.from("club_venues").select("lat, lng").eq("club_id", club!.id).single();
+    expect(venue).toEqual({ lat: area!.lat, lng: area!.lng });
+  });
+
+  it("a bad plan aborts the whole save", async () => {
+    const { clubId } = await oryxSessions(clubOwner.c);
+    const count = async (t: string) => (await clubOwner.c.from(t).select("id", { count: "exact", head: true }).eq("club_id", clubId)).count;
+    const before = [await count("club_venues"), await count("club_sessions")];
+    const { data: area } = await clubOwner.c.from("areas").select("id, lat, lng").eq("slug", "arabian-ranches").single();
+    const { data: sport } = await clubOwner.c.from("sports").select("id").eq("slug", "football").single();
+    const { error } = await clubOwner.c.rpc("save_club_schedule", {
+      p_club: clubId,
+      p_payload: {
+        plans: [],
+        venues: [{ name: "Only", areaId: area!.id, lat: area!.lat, lng: area!.lng, groups: [
+          { name: "", ageMin: 6, ageMax: 8, sessions: [{ sportId: sport!.id, day: 0, start: "16:30", end: "17:30", trialAvailable: false }],
+            plans: [{ kind: "block", priceAed: 100, sessionsCount: 12, label: "" }] },
+        ] }],
+      },
+    });
+    expect(error).not.toBeNull();
+    expect([await count("club_venues"), await count("club_sessions")]).toEqual(before);
   });
 });
 

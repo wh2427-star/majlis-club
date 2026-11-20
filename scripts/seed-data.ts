@@ -17,6 +17,18 @@ export type SeedClub = {
   trial?: boolean;
   featured?: boolean;
   photos: number;
+  /** Several venues with their own groups and prices. Without it, the club has one venue named after its area. */
+  venues?: SeedVenue[];
+  /** Club-wide prices. Without it, each distinct session price becomes a per-session plan. */
+  plans?: SeedPlan[];
+};
+
+export type SeedPlan = { kind: "per_session" | "per_term" | "per_year" | "block"; price: number; sessions?: number; label?: string };
+export type SeedVenue = {
+  name: string;
+  area: SeedClub["area"];
+  offset: [number, number];
+  groups: { name: string; ageMin: number; ageMax: number; sessions: [sport: string, day: number, start: string, end: string, trial?: boolean][]; plans: SeedPlan[] }[];
 };
 
 // Days: 0 Mon, 1 Tue, 2 Wed, 3 Thu, 4 Fri, 5 Sat, 6 Sun
@@ -24,7 +36,18 @@ export const seedClubs: SeedClub[] = [
   // Arabian Ranches (10)
   { slug: "oryx-owls-football", name: "Oryx Owls Football", type: "academy", area: "arabian-ranches", offset: [0.002, 0.001], licence: "verified", featured: true, photos: 2,
     description: "Small-sided football with a coach for every eight players. Boots and shin pads needed.",
-    sessions: [["football", 0, "16:30", "17:30", 6, 12, 85], ["football", 2, "16:30", "17:30", 6, 12, 85]] },
+    sessions: [["football", 0, "16:30", "17:30", 6, 8, 85], ["football", 2, "16:30", "17:30", 9, 12, 95], ["football", 5, "09:00", "10:00", 6, 12, 75]],
+    plans: [{ kind: "per_session", price: 95 }],
+    venues: [
+      { name: "Ranches Community Pitch", area: "arabian-ranches", offset: [0.002, 0.001], groups: [
+        { name: "Under 9s", ageMin: 6, ageMax: 8, sessions: [["football", 0, "16:30", "17:30", true]],
+          plans: [{ kind: "per_session", price: 85 }, { kind: "block", price: 600, sessions: 8 }] },
+        { name: "Under 13s", ageMin: 9, ageMax: 12, sessions: [["football", 2, "16:30", "17:30"]], plans: [] },
+      ] },
+      { name: "Springs Park Field", area: "the-springs", offset: [0.001, -0.002], groups: [
+        { name: "Juniors", ageMin: 6, ageMax: 12, sessions: [["football", 5, "09:00", "10:00"]], plans: [{ kind: "per_term", price: 900, sessions: 12 }] },
+      ] },
+    ] },
   { slug: "ghaf-tree-swim-squad", name: "Ghaf Tree Swim Squad", type: "academy", area: "arabian-ranches", offset: [-0.004, 0.003], licence: "verified", trial: true, photos: 2,
     description: "Learn-to-swim and stroke clubs in a shaded outdoor pool. Groups by ability, not age.",
     sessions: [["swimming", 5, "09:00", "10:00", 4, 10, 110], ["swimming", 1, "17:00", "18:00", 7, 14, 110]] },

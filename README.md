@@ -62,3 +62,4 @@ First Playwright run: `npx playwright install chromium`.
 6. **Parity**: club type never affects ranking (unit test).
 7. **Children's privacy**: photo consent per upload, report hides a photo immediately, caption name hint, children stored as nickname + birth year.
 8. **Licences**: badge only for an approved, unexpired licence; authority is free text `[CONFIRM]`.
+- Clubs have venues → age groups → session times and prices (per session, per term, per year, or a 5–10 session block). Parents can request a free trial of a trial session; clubs accept or decline. Prices filter results but never rank them. See DECISIONS.md.

@@ -13,11 +13,14 @@ describe("weekChange", () => {
 });
 
 describe("profileChecklist", () => {
-  const blank = { description: "", coachCredentials: "", ageGroups: [], photoCount: 0, licenceVerified: false, sessionCount: 0 };
-  it("lists six undone items in order for a blank club", () => {
+  const blank = { description: "", coachCredentials: "", ageGroups: [], photoCount: 0, licenceVerified: false, sessionCount: 0, planCount: 0 };
+  it("lists seven undone items in order for a blank club", () => {
     expect(profileChecklist(blank)).toEqual(
-      ["description", "coachCredentials", "ageGroups", "photos", "licence", "schedule"].map((key) => ({ key, done: false })),
+      ["description", "coachCredentials", "ageGroups", "photos", "licence", "schedule", "prices"].map((key) => ({ key, done: false })),
     );
+  });
+  it("counts prices as done once a plan exists", () => {
+    expect(profileChecklist({ ...blank, planCount: 1 }).find((i) => i.key === "prices")!.done).toBe(true);
   });
   it("counts a description as done from 40 characters", () => {
     expect(profileChecklist({ ...blank, description: "x".repeat(39) })[0].done).toBe(false);

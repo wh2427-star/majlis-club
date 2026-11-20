@@ -14,6 +14,9 @@ import {
   firstClusterIdentified,
   placeholderPhotoSvg,
   seedClubs,
+  type SeedClub,
+  type SeedPlan,
+  type SeedVenue,
   waitlistSeed,
 } from "./seed-data";
 
@@ -62,12 +65,44 @@ async function ensureUser(email: string, displayName: string, role: "parent" | "
   return created.data.user.id;
 }
 
+let areaBy: Record<string, { id: string; slug: string; name: string; lat: number; lng: number; cluster_id: string }> = {};
+let sportBy: Record<string, string> = {};
+
+type PlanRow = { kind: SeedPlan["kind"]; price_aed: number; sessions_count: number | null; label: string; sort: number };
+const planRows = (plans: SeedPlan[]): PlanRow[] =>
+  plans.map((p, i) => ({ kind: p.kind, price_aed: p.price, sessions_count: p.sessions ?? null, label: p.label ?? "", sort: i }));
+
+/** Venues, groups, sessions and price plans. One venue per club unless the seed lists several. */
+async function insertSchedule(clubId: string, c: SeedClub, home: { id: string; name: string; lat: number; lng: number }) {
+  const venues: SeedVenue[] = c.venues ?? [{
+    name: home.name, area: c.area, offset: c.offset,
+    groups: [...new Map(c.sessions.map((s) => [`${s[4]}-${s[5]}`, { ageMin: s[4], ageMax: s[5] }])).values()].map((g) => ({
+      name: "", ...g,
+      sessions: c.sessions.filter((s) => s[4] === g.ageMin && s[5] === g.ageMax).map((s) => [s[0], s[1], s[2], s[3], !!c.trial] as [string, number, string, string, boolean]),
+      plans: [],
+    })),
+  }];
+  const plans = c.plans ?? [...new Set(c.sessions.map((s) => s[6]))].map((price) => ({ kind: "per_session" as const, price }));
+  if (plans.length) must(await db.from("club_price_plans").insert(planRows(plans).map((p) => ({ ...p, club_id: clubId }))), "club plans");
+  for (const [vi, v] of venues.entries()) {
+    const area = areaBy[v.area];
+    const venue = must(await db.from("club_venues").insert({ club_id: clubId, name: v.name, area_id: area.id, lat: area.lat + v.offset[0], lng: area.lng + v.offset[1], sort: vi }).select("id").single(), "venue");
+    for (const [gi, g] of v.groups.entries()) {
+      const group = must(await db.from("club_groups").insert({ club_id: clubId, venue_id: venue.id, name: g.name, age_min: g.ageMin, age_max: g.ageMax, sort: gi }).select("id").single(), "group");
+      if (g.sessions.length) must(await db.from("club_sessions").insert(g.sessions.map(([sport, day, start, end, trial]) => ({
+        club_id: clubId, group_id: group.id, sport_id: sportBy[sport], day, start_time: start, end_time: end, age_min: g.ageMin, age_max: g.ageMax, trial_available: !!trial,
+      }))), "sessions");
+      if (g.plans.length) must(await db.from("club_price_plans").insert(planRows(g.plans).map((p) => ({ ...p, club_id: clubId, group_id: group.id }))), "group plans");
+    }
+  }
+}
+
 async function main() {
   // Reference rows
-  const areas = must(await db.from("areas").select("id, slug, lat, lng, cluster_id"), "areas");
+  const areas = must(await db.from("areas").select("id, slug, name, lat, lng, cluster_id"), "areas");
   const sports = must(await db.from("sports").select("id, slug"), "sports");
-  const areaBy = Object.fromEntries(areas.map((a) => [a.slug, a]));
-  const sportBy = Object.fromEntries(sports.map((s) => [s.slug, s.id]));
+  areaBy = Object.fromEntries(areas.map((a) => [a.slug, a]));
+  sportBy = Object.fromEntries(sports.map((s) => [s.slug, s.id]));
 
   // Users
   const ids: Record<keyof typeof demoAccounts, string> = {} as never;
@@ -118,14 +153,7 @@ async function main() {
 
     const clubSports = [...new Set(c.sessions.map((s) => s[0]))].map((s) => ({ club_id: row.id, sport_id: sportBy[s] }));
     must(await db.from("club_sports").insert(clubSports), "club sports");
-    must(
-      await db.from("club_sessions").insert(
-        c.sessions.map(([sport, day, start, end, ageMin, ageMax, price]) => ({
-          club_id: row.id, sport_id: sportBy[sport], day, start_time: start, end_time: end, age_min: ageMin, age_max: ageMax, price_aed: price,
-        })),
-      ),
-      "sessions",
-    );
+    await insertSchedule(row.id, c, area);
 
     if (c.licence) {
       const base = { club_id: row.id, number: `DEMO-${c.slug.slice(0, 6).toUpperCase()}-001`, issuing_authority: "Demo issuing authority [CONFIRM]" };
@@ -137,7 +165,6 @@ async function main() {
             : { ...base, status: "pending", expires_on: dateIn(200) };
       must(await db.from("licences").insert(licence), "licence");
     }
-    if (c.trial) must(await db.from("promotions").insert({ club_id: row.id, kind: "trial_offer" }), "trial");
     if (c.featured) must(await db.from("promotions").insert({ club_id: row.id, kind: "featured", area_id: area.id }), "featured");
 
     for (let i = 0; i < c.photos; i++) {
@@ -170,7 +197,10 @@ async function main() {
     }).select("id").single(),
     "pending club",
   );
-  must(await db.from("club_sessions").insert({ club_id: pending.id, sport_id: sportBy["martial-arts"], day: 2, start_time: "17:00", end_time: "18:00", age_min: 6, age_max: 14, price_aed: 70 }), "pending session");
+  await insertSchedule(pending.id, {
+    slug: "mirage-martial-arts", name: "Mirage Martial Arts", type: "academy", area: "the-springs", offset: [0.003, -0.002], description: "", photos: 0,
+    sessions: [["martial-arts", 2, "17:00", "18:00", 6, 14, 70]],
+  }, areaBy["the-springs"]);
   must(await db.from("club_sports").insert({ club_id: pending.id, sport_id: sportBy["martial-arts"] }), "pending sport");
 
   // Demo club owner manages two clubs: one busy, one quiet.
@@ -203,6 +233,22 @@ async function main() {
     ...savers.map((parent_id) => ({ parent_id, club_id: clubIds[demoOwnedClub] })),
     ...savers.slice(0, 2).map((parent_id) => ({ parent_id, club_id: clubIds[demoOwnedClubQuiet] })),
   ]), "seed saves");
+  // Trial requests for the busy club's trial session: two waiting, one accepted. The demo parent's shows in the family view.
+  const trialSession = must(await db.from("club_sessions").select("id, sport_id, day, start_time, club_groups(club_venues(name))").eq("club_id", clubIds[demoOwnedClub]).eq("trial_available", true).limit(1).single(), "trial session") as unknown as
+    { id: string; sport_id: string; day: number; start_time: string; club_groups: { club_venues: { name: string } } };
+  const trialBase = {
+    club_id: clubIds[demoOwnedClub], session_id: trialSession.id, sport_id: trialSession.sport_id, session_day: trialSession.day,
+    session_start: trialSession.start_time, venue_name: trialSession.club_groups.club_venues.name,
+  };
+  must(await db.from("trial_requests").insert([
+    { ...trialBase, parent_id: ids.parent, child_nickname: "Bean", child_birth_year: new Date().getFullYear() - 8, contact_name: demoAccounts.parent.displayName,
+      contact_email: demoAccounts.parent.email, contact_consent_at: daysAgo(1), preferred_date: dateIn(7), status: "requested", created_at: daysAgo(1) },
+    { ...trialBase, parent_id: savers[0], child_nickname: "Kit", child_birth_year: new Date().getFullYear() - 7, contact_name: "Seed Parent 1",
+      contact_email: "parent.seed.1@example.com", contact_consent_at: daysAgo(3), preferred_date: dateIn(4), status: "requested", created_at: daysAgo(3) },
+    { ...trialBase, parent_id: savers[1], child_nickname: "Rae", child_birth_year: new Date().getFullYear() - 6, contact_name: "Seed Parent 2",
+      contact_email: "parent.seed.2@example.com", contact_consent_at: daysAgo(9), preferred_date: dateIn(2), status: "accepted", created_at: daysAgo(9) },
+  ]), "trial requests");
+
   must(await db.from("clubs").update({ coach_credentials: "Level 2 licensed coaches, First Aid certified", age_groups: ["6-8", "9-12"] }).eq("id", clubIds[demoOwnedClub]), "oryx extras");
 
   // Enquiries: 11 to the busy club in the last 30 days (crosses the default threshold of 10).

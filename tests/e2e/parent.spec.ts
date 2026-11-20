@@ -65,10 +65,10 @@ test("empty result shows what is listed nearby and invites a suggestion", async 
   await expect(page.getByText("Thanks. We will get in touch with the club.")).toBeVisible();
 });
 
-test("club profile: facts, then photos, description and coaches, then the enquiry button", async ({ page }) => {
+test("club profile: facts, venues and prices, then photos, description and coaches, then the enquiry button", async ({ page }) => {
   await page.goto("/clubs/oryx-owls-football?area=arabian-ranches");
   const sections = await page.locator("[data-section]").evaluateAll((els) => els.map((e) => e.getAttribute("data-section")));
-  expect(sections).toEqual(["facts", "photos", "description", "coaches", "actions"]);
+  expect(sections).toEqual(["facts", "venues", "prices", "photos", "description", "coaches", "actions"]);
   await expect(page.getByText("Licence verified")).toBeVisible();
   await expect(page.getByRole("button", { name: "Report this photo" }).first()).toBeVisible();
   for (const img of await page.locator("[data-section=photos] img").all()) {
@@ -104,8 +104,8 @@ test("family screen: children, saved clubs, enquiry status and the week", async 
   await expect(page.getByTestId("week")).toContainText("Monday");
   await expect(page.getByTestId("week")).toContainText("Oryx Owls Football");
   await expect(page.getByText("Fixtures")).toHaveCount(0);
-  await page.getByLabel("Nickname").fill("Pip");
-  await page.getByLabel("Birth year").fill(String(new Date().getFullYear() - 6));
+  await page.getByLabel("Nickname", { exact: true }).fill("Pip");
+  await page.getByLabel("Birth year", { exact: true }).fill(String(new Date().getFullYear() - 6));
   await page.getByRole("button", { name: "Add child" }).click();
   await expect(page.getByText(/^Pip, age 6$/)).toBeVisible();
 });
@@ -141,4 +141,93 @@ test("empty profile sections are hidden", async ({ page }) => {
   await page.goto("/clubs/oryx-owls-football");
   await expect(page.locator('[data-section="coaches"]')).toContainText("Level 2");
   await expect(page.locator('[data-section="photos"]')).toHaveCount(1);
+});
+
+test("card shows the lowest per-session price across groups and the nearest venue's area", async ({ page }) => {
+  await page.goto("/results?area=the-springs");
+  const card = page.locator('[data-testid=club-card]', { hasText: "Oryx Owls Football" });
+  // Springs Park Field term: AED 900 for 12 sessions = AED 75 a session, the lowest of all Oryx prices.
+  await expect(card.locator("[data-fact=price] dd")).toHaveText("from AED 75 a session");
+  await expect(card.locator("[data-fact=area] dd")).toHaveText("The Springs");
+});
+
+test("profile lists each venue with its groups, times and prices", async ({ page }) => {
+  await page.goto("/clubs/oryx-owls-football");
+  const venues = page.locator("[data-section=venues]");
+  await expect(venues.getByRole("heading", { name: /Ranches Community Pitch/ })).toBeVisible();
+  await expect(venues.getByRole("heading", { name: /Springs Park Field/ })).toBeVisible();
+  const under9 = venues.locator("[data-group]", { hasText: "Under 9s" });
+  await expect(under9).toContainText("Ages 6 to 8");
+  await expect(under9).toContainText("AED 85 a session");
+  await expect(under9).toContainText("AED 600 for 8 sessions");
+  // Under 13s has no prices of its own: the club-wide price applies.
+  await expect(venues.locator("[data-group]", { hasText: "Under 13s" })).toContainText("AED 95 a session");
+  await expect(venues.locator("[data-group]", { hasText: "Juniors" })).toContainText("AED 900 a term (12 sessions)");
+  await expect(page.locator("[data-section=prices]")).toContainText("AED 95 a session");
+});
+
+test("Book a free trial sits only on trial sessions", async ({ page }) => {
+  await page.goto("/clubs/oryx-owls-football");
+  const trial = page.getByRole("link", { name: "Book a free trial" });
+  await expect(trial).toHaveCount(1);
+  await expect(page.locator("[data-group]", { hasText: "Under 9s" }).getByRole("link", { name: "Book a free trial" })).toBeVisible();
+  await expect(trial).toHaveAttribute("href", /\/auth\/sign-in\?next=%2Ftrial%2Foryx-owls-football%3Fsession%3D/);
+  await expect(page.getByText("Trial session").first()).toBeVisible();
+});
+
+test("parent books a free trial, sees it requested, and cannot ask twice", async ({ page }) => {
+  await signIn(page, "parent2");
+  await page.goto("/clubs/oryx-owls-football");
+  await page.getByRole("link", { name: "Book a free trial" }).click();
+  await expect(page.getByRole("heading", { level: 1, name: "Book a free trial at Oryx Owls Football" })).toBeVisible();
+  await expect(page.getByRole("radio", { name: /Under 9s at Ranches Community Pitch/ })).toBeChecked();
+  // parent2 has no saved children, so the child is typed in.
+  await page.getByLabel("Nickname", { exact: true }).fill("Juno");
+  await page.getByLabel("Birth year", { exact: true }).fill(String(new Date().getFullYear() - 7));
+  const inThreeDays = new Date(Date.now() + 3 * 864e5).toISOString().slice(0, 10);
+  await page.getByLabel("Preferred date").fill(inThreeDays);
+  await page.getByLabel(/will see your name/).check();
+  await page.getByRole("button", { name: "Ask for a free trial" }).click();
+  await page.waitForURL(/\/family#trials$/);
+  const trials = page.getByRole("region", { name: "Trial requests" });
+  await expect(trials).toContainText("Oryx Owls Football");
+  await expect(trials).toContainText("Requested");
+
+  await page.goBack();
+  await page.getByLabel("Nickname", { exact: true }).fill("Juno");
+  await page.getByLabel("Birth year", { exact: true }).fill(String(new Date().getFullYear() - 7));
+  await page.getByLabel("Preferred date").fill(inThreeDays);
+  await page.getByLabel(/will see your name/).check();
+  await page.getByRole("button", { name: "Ask for a free trial" }).click();
+  await expect(page.getByText("You already asked for a trial of this session.")).toBeVisible();
+});
+
+test("a signed-out parent is sent to sign in, then back to the trial form", async ({ page }) => {
+  await page.goto("/clubs/oryx-owls-football");
+  const href = await page.getByRole("link", { name: "Book a free trial" }).getAttribute("href");
+  expect(href).toMatch(/^\/auth\/sign-in\?next=%2Ftrial%2Foryx-owls-football/);
+  await page.goto("/trial/oryx-owls-football");
+  await expect(page).toHaveURL(/\/auth\/sign-in\?next=/);
+});
+
+test("a club without free trials cannot be booked", async ({ page }) => {
+  await signIn(page, "parent");
+  await page.goto("/trial/camel-cove-cricket");
+  await expect(page.getByRole("heading", { name: "We could not find that page." })).toBeVisible();
+});
+
+test("an out-of-date trial link still opens the form, with the club's trial session chosen", async ({ page }) => {
+  // Session ids change whenever the club saves its schedule, so old links must not dead-end.
+  await signIn(page, "parent");
+  await page.goto("/trial/oryx-owls-football?session=00000000-0000-4000-8000-000000000000");
+  await expect(page.getByRole("heading", { level: 1, name: "Book a free trial at Oryx Owls Football" })).toBeVisible();
+  await expect(page.getByRole("radio", { name: /Under 9s at Ranches Community Pitch/ })).toBeChecked();
+});
+
+test("the family view shows the demo parent's trial request", async ({ page }) => {
+  await signIn(page, "parent");
+  await page.goto("/family");
+  await expect(page.getByRole("region", { name: "Trial requests" })).toContainText("Football trial at Oryx Owls Football");
+  // Seeded as requested; the club test may have accepted it already in this run.
+  await expect(page.getByRole("region", { name: "Trial requests" })).toContainText(/Requested|Accepted/);
 });

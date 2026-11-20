@@ -15,8 +15,9 @@ import type { IconName } from "@/components/ui/Icon";
 export const metadata = { title: "Family" };
 
 const statusIcon: Record<string, IconName> = { sent: "clock", seen: "check", replied: "check", closed: "x" };
+const trialIcon: Record<string, IconName> = { requested: "clock", accepted: "check", declined: "x" };
 
-/** Child profiles, saved clubs, enquiry status and the week. No fixtures, messages or payments. */
+/** Child profiles, saved clubs, enquiry and trial status, and the week. No fixtures, messages or payments. */
 export default async function FamilyPage() {
   await requireUser("/family");
   const [t, format, family] = await Promise.all([getTranslations(), getFormatter(), getFamily()]);
@@ -105,6 +106,28 @@ export default async function FamilyPage() {
           <IllustratedMessage art={getAnyIllustration("family-enquiries", savedArt.variant)}>
             <p>{t("family.noEnquiries")}</p>
           </IllustratedMessage>
+        )}
+      </Section>
+
+      <Section title={t("family.trialsTitle")} id="trials">
+        {family.trials.length ? (
+          <ul className="flex flex-col gap-2">
+            {family.trials.map((r) => (
+              <li key={r.id} className="flex flex-wrap items-center justify-between gap-2 rounded-card bg-white p-3">
+                <span>
+                  {t("family.trialLine", {
+                    sport: r.sportSlug ? t(`sports.${r.sportSlug}`) : "",
+                    club: r.clubName,
+                    date: format.dateTime(new Date(`${r.preferredDate}T12:00:00`), { weekday: "short", day: "numeric", month: "short" }),
+                  })}
+                  {r.venueName ? <span className="block text-sm">{r.venueName}</span> : null}
+                </span>
+                <Badge kind="status" icon={trialIcon[r.status]}>{t(`family.trialStatus.${r.status}`)}</Badge>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p>{t("family.noTrials")}</p>
         )}
       </Section>
     </>

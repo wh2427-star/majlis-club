@@ -1,6 +1,6 @@
 /**
  * "Answers first": the facts every club card shows, in a fixed order:
- * sport, age range, days and times, area, price per session, distance.
+ * sport, age range, days and times, area, price, distance.
  * Returns structured data; the UI turns it into words through i18n.
  */
 import type { Session } from "./types";
@@ -11,8 +11,6 @@ export type ClubFacts = {
   ageMax: number;
   /** Distinct days in week order, each with its distinct start times. */
   schedule: { day: number; starts: string[] }[];
-  priceMinAed: number;
-  priceMaxAed: number;
 };
 
 export function summariseSessions(sessions: Session[]): ClubFacts | null {
@@ -26,14 +24,11 @@ export function summariseSessions(sessions: Session[]): ClubFacts | null {
   const schedule = [...byDay.entries()]
     .sort(([a], [b]) => a - b)
     .map(([day, starts]) => ({ day, starts: [...starts].sort() }));
-  const prices = sessions.map((s) => s.priceAed);
   return {
     sports,
     ageMin: Math.min(...sessions.map((s) => s.ageMin)),
     ageMax: Math.max(...sessions.map((s) => s.ageMax)),
     schedule,
-    priceMinAed: Math.min(...prices),
-    priceMaxAed: Math.max(...prices),
   };
 }
 

@@ -56,6 +56,14 @@ export async function submitLicenceAction(_: ActionState, form: FormData) {
   return res;
 }
 
+export async function setTrialStatusAction(form: FormData) {
+  const clubId = String(form.get("clubId") ?? "");
+  const status = String(form.get("status") ?? "");
+  if (status !== "accepted" && status !== "declined") return;
+  await club.setTrialStatus(clubId, String(form.get("trialId") ?? ""), status);
+  revalidatePath(`/club/${clubId}`);
+}
+
 export async function setEnquiryStatusAction(form: FormData) {
   const clubId = String(form.get("clubId") ?? "");
   const status = String(form.get("status") ?? "");
