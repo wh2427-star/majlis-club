@@ -3,7 +3,7 @@ import { captionNameWarning, coverage, isLicenceVerified, licenceState, shouldSh
 import { formatTime12, summariseSessions } from "@/lib/domain/facts";
 import { buildWeek } from "@/lib/domain/schedule";
 import { haversineKm } from "@/lib/domain/distance";
-import { basicsSchema, pricePlanSchema, trialRequestSchema } from "@/lib/schemas";
+import { basicsSchema, pricePlanSchema, scheduleFieldKey, scheduleSchema, trialRequestSchema } from "@/lib/schemas";
 
 describe("licence badge (rule 8)", () => {
   const today = "2026-11-18";
@@ -156,5 +156,25 @@ describe("trialRequestSchema", () => {
   });
   it("needs consent", () => {
     expect(err({ ...base, consent: undefined })).toBe("errors.consent");
+  });
+});
+
+describe("scheduleSchema", () => {
+  const uuid = "11111111-1111-4111-8111-111111111111";
+  const venue = (groups: object[]) => ({ name: "Hall", areaId: uuid, lat: 25, lng: 55, groups });
+  const group = (plans: object[] = []) => ({ name: "", ageMin: 6, ageMax: 8, sessions: [{ sportId: uuid, day: 0, start: "16:30", end: "17:30" }], plans });
+  it("keys an error by its place in the editor", () => {
+    const r = scheduleSchema.safeParse({ plans: [], venues: [venue([group()]), venue([group([{ kind: "block", priceAed: 1, sessionsCount: 12 }])])] });
+    expect(r.success).toBe(false);
+    const issue = r.error!.issues[0];
+    expect(issue.message).toBe("errors.blockSessions");
+    expect(scheduleFieldKey(issue.path)).toBe("v1-g0-p0-sessionsCount");
+  });
+  it("caps venues at 5", () => {
+    const r = scheduleSchema.safeParse({ plans: [], venues: Array.from({ length: 6 }, () => venue([])) });
+    expect(r.error?.issues[0].message).toBe("errors.tooManyVenues");
+  });
+  it("accepts a valid schedule", () => {
+    expect(scheduleSchema.safeParse({ plans: [{ kind: "per_session", priceAed: 50 }], venues: [venue([group()])] }).success).toBe(true);
   });
 });

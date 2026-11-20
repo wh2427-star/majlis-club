@@ -46,19 +46,6 @@ export const enquirySchema = z.object({
   consent: z.literal("on", { message: "errors.consent" }),
 });
 
-export const sessionSchema = z
-  .object({
-    sportId: z.string().uuid("errors.sport"),
-    day: z.coerce.number().int().min(0).max(6),
-    start: time,
-    end: time,
-    ageMin: z.coerce.number().int().min(2, "errors.age").max(18, "errors.age"),
-    ageMax: z.coerce.number().int().min(2, "errors.age").max(18, "errors.age"),
-    trialAvailable: z.boolean().default(false),
-  })
-  .refine((s) => s.end > s.start, { message: "errors.endAfterStart", path: ["end"] })
-  .refine((s) => s.ageMax >= s.ageMin, { message: "errors.ageRange", path: ["ageMax"] });
-
 export const ageGroupValues = ["3-5", "6-8", "9-12", "13+"] as const;
 
 /** Listing step 1. Age groups are labels for parents; they never affect search. */
@@ -126,7 +113,10 @@ export const planKinds = ["per_session", "per_term", "per_year", "block"] as con
 export const pricePlanSchema = z
   .object({
     kind: z.enum(planKinds, { message: "errors.planKind" }),
-    priceAed: z.coerce.number({ message: "errors.price" }).min(0, "errors.price").max(100000, "errors.price"),
+    priceAed: z.preprocess(
+      (v) => (v === "" || v === null ? undefined : v),
+      z.coerce.number({ message: "errors.price" }).min(0, "errors.price").max(100000, "errors.price"),
+    ),
     sessionsCount: z.preprocess((v) => (v === "" || v === undefined ? null : v), z.coerce.number().int().nullable()),
     label: z.string().trim().max(40, "errors.planLabel").default(""),
   })
@@ -163,3 +153,55 @@ export const trialRequestSchema = z
     consent: z.literal("on", { message: "errors.consent" }),
   })
   .refine((r) => !!r.childId || (!!r.childNickname && r.childBirthYear != null), { message: "errors.child", path: ["childNickname"] });
+
+/** A session time within a group; the group holds the ages. */
+export const groupSessionSchema = z
+  .object({
+    sportId: z.string().uuid("errors.sport"),
+    day: z.coerce.number().int().min(0).max(6),
+    start: time,
+    end: time,
+    trialAvailable: z.boolean().default(false),
+  })
+  .refine((s) => s.end > s.start, { message: "errors.endAfterStart", path: ["end"] });
+
+export const groupSchema = z
+  .object({
+    name: z.string().trim().max(60, "errors.groupName").default(""),
+    ageMin: z.coerce.number().int().min(2, "errors.age").max(18, "errors.age"),
+    ageMax: z.coerce.number().int().min(2, "errors.age").max(18, "errors.age"),
+    sessions: z.array(groupSessionSchema).max(14, "errors.tooManySessions"),
+    plans: z.array(pricePlanSchema).max(8, "errors.tooManyPlans"),
+  })
+  .refine((g) => g.ageMax >= g.ageMin, { message: "errors.ageRange", path: ["ageMax"] });
+
+export const venueSchema = z.object({
+  name: trimmed(1, 80, "errors.venueName"),
+  areaId: z.string().uuid("errors.area"),
+  lat: z.coerce.number().min(-90).max(90),
+  lng: z.coerce.number().min(-180).max(180),
+  groups: z.array(groupSchema).max(10, "errors.tooManyGroups"),
+});
+
+/** Listing step 2: venues, their groups (ages, times, prices) and the club-wide prices. */
+export const scheduleSchema = z.object({
+  venues: z.array(venueSchema).max(5, "errors.tooManyVenues"),
+  plans: z.array(pricePlanSchema).max(8, "errors.tooManyPlans"),
+});
+export type ScheduleInput = z.infer<typeof scheduleSchema>;
+
+const pathPrefix: Record<string, string> = { venues: "v", groups: "g", sessions: "s", plans: "p" };
+
+/** Zod issue path → editor field key: ["venues", 1, "groups", 0, "plans", 2, "sessionsCount"] → "v1-g0-p2-sessionsCount". */
+export function scheduleFieldKey(path: PropertyKey[]): string {
+  const parts: string[] = [];
+  for (let i = 0; i < path.length; i++) {
+    const seg = String(path[i]);
+    const next = path[i + 1];
+    if (pathPrefix[seg] && typeof next === "number") {
+      parts.push(`${pathPrefix[seg]}${next}`);
+      i++;
+    } else parts.push(seg);
+  }
+  return parts.join("-") || "schedule";
+}

@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getClubById, getCurrentUser, getMyClubs } from "@/lib/data/queries";
-import { basicsSchema, fieldErrors, licenceSchema, photoSchema, sessionSchema } from "@/lib/schemas";
+import { basicsSchema, fieldErrors, licenceSchema, photoSchema, scheduleFieldKey, scheduleSchema } from "@/lib/schemas";
 import { licenceState, shouldShowUpgradePrompt } from "@/lib/domain/rules";
 import { viewsTrend } from "@/lib/domain/dashboard";
 import { appConfig } from "@/config/app";
@@ -127,38 +127,41 @@ export async function updateBasics(clubId: string, form: FormData): Promise<Acti
   return { ok: true, message: "editor.savedChanges" };
 }
 
-/** Listing step 2: replace the full list of sessions. The club's sports are its session sports plus its main sport. */
+/**
+ * Listing step 2: replace the club's venues, groups, times and prices in one transaction.
+ * Groups with no times and no prices, and venues left with no groups, are dropped.
+ * The club's sports are its session sports plus its main sport.
+ */
 export async function updateSchedule(clubId: string, form: FormData): Promise<ActionState> {
   const { club } = await requireClubAccess(clubId, `/club/${clubId}/edit/schedule`);
-  let rawSessions: unknown[] = [];
+  let raw: unknown;
   try {
-    rawSessions = JSON.parse(String(form.get("sessions") ?? "[]"));
+    raw = JSON.parse(String(form.get("schedule") ?? "{}"));
   } catch {
-    return { ok: false, errors: { sessions: "errors.invalid" } };
+    return { ok: false, errors: { schedule: "errors.invalid" } };
   }
-  const sessions = [];
-  for (const [i, raw] of rawSessions.entries()) {
-    const parsed = sessionSchema.safeParse(raw);
-    if (!parsed.success) {
-      const [field, key] = Object.entries(fieldErrors(parsed.error))[0];
-      return { ok: false, errors: { [`session-${i}-${field}`]: key, sessions: key } };
+  const parsed = scheduleSchema.safeParse(raw);
+  if (!parsed.success) {
+    const errors: Record<string, string> = {};
+    for (const issue of parsed.error.issues) {
+      const key = scheduleFieldKey(issue.path);
+      const msg = issue.message.startsWith("errors.") ? issue.message : "errors.invalid";
+      if (!errors[key]) errors[key] = msg;
+      if (!errors.schedule) errors.schedule = msg;
     }
-    sessions.push(parsed.data);
+    return { ok: false, errors };
   }
+  const venues = parsed.data.venues
+    .map((v) => ({ ...v, groups: v.groups.filter((g) => g.sessions.length || g.plans.length) }))
+    .filter((v) => v.groups.length);
   const db = await createClient();
-  await db.from("club_sessions").delete().eq("club_id", clubId);
-  if (sessions.length) {
-    const { error } = await db.from("club_sessions").insert(
-      sessions.map((s) => ({
-        club_id: clubId, sport_id: s.sportId, day: s.day, start_time: s.start, end_time: s.end,
-        age_min: s.ageMin, age_max: s.ageMax,
-      })),
-    );
-    if (error) return { ok: false, message: "errors.generic" };
-  }
-  await db.from("club_sports").delete().eq("club_id", clubId);
-  const sportIds = [...new Set([...sessions.map((s) => s.sportId), ...(club.primarySportId ? [club.primarySportId] : [])])];
-  if (sportIds.length) await db.from("club_sports").insert(sportIds.map((sport_id) => ({ club_id: clubId, sport_id })));
+  const { error } = await db.rpc("save_club_schedule", { p_club: clubId, p_payload: { venues, plans: parsed.data.plans } });
+  if (error) return { ok: false, message: "errors.generic" };
+  const sessionSports = venues.flatMap((v) => v.groups.flatMap((g) => g.sessions.map((s) => s.sportId)));
+  const sportIds = [...new Set([...sessionSports, ...(club.primarySportId ? [club.primarySportId] : [])])];
+  const del = await db.from("club_sports").delete().eq("club_id", clubId);
+  const ins = sportIds.length ? await db.from("club_sports").insert(sportIds.map((sport_id) => ({ club_id: clubId, sport_id }))) : { error: null };
+  if (del.error || ins.error) return { ok: false, message: "errors.generic" };
   return { ok: true, message: "editor.savedChanges" };
 }
 
