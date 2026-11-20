@@ -210,12 +210,18 @@ test("a signed-out parent is sent to sign in, then back to the trial form", asyn
   await expect(page).toHaveURL(/\/auth\/sign-in\?next=/);
 });
 
-test("a session without a free trial cannot be booked", async ({ page }) => {
+test("a club without free trials cannot be booked", async ({ page }) => {
   await signIn(page, "parent");
   await page.goto("/trial/camel-cove-cricket");
   await expect(page.getByRole("heading", { name: "We could not find that page." })).toBeVisible();
+});
+
+test("an out-of-date trial link still opens the form, with the club's trial session chosen", async ({ page }) => {
+  // Session ids change whenever the club saves its schedule, so old links must not dead-end.
+  await signIn(page, "parent");
   await page.goto("/trial/oryx-owls-football?session=00000000-0000-4000-8000-000000000000");
-  await expect(page.getByRole("heading", { name: "We could not find that page." })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Book a free trial at Oryx Owls Football" })).toBeVisible();
+  await expect(page.getByRole("radio", { name: /Under 9s at Ranches Community Pitch/ })).toBeChecked();
 });
 
 test("the family view shows the demo parent's trial request", async ({ page }) => {

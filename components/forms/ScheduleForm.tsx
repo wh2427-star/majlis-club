@@ -17,6 +17,7 @@ export type AreaOpt = Opt & { lat: number; lng: number };
 const MAX_VENUES = 5;
 const MAX_GROUPS = 10;
 const MAX_PLANS = 8;
+const MAX_SESSIONS = 14;
 const planKinds: PlanKind[] = ["per_session", "per_term", "per_year", "block"];
 
 function toPlan(p: EditorPlan): PricePlan {
@@ -191,12 +192,14 @@ export function ScheduleForm({
                       </div>
                     );
                   })}
-                  <Button
-                    type="button" variant="secondary"
-                    onClick={() => updGroup(vi, gi, (x) => ({ ...x, sessions: [...x.sessions, { sportId: newSport.value, sportSlug: newSport.slug, day: 0, start: "16:30", end: "17:30", trialAvailable: false }] }))}
-                  >
-                    {t("editor.addSession")}
-                  </Button>
+                  {g.sessions.length < MAX_SESSIONS ? (
+                    <Button
+                      type="button" variant="secondary"
+                      onClick={() => updGroup(vi, gi, (x) => ({ ...x, sessions: [...x.sessions, { sportId: newSport.value, sportSlug: newSport.slug, day: 0, start: "16:30", end: "17:30", trialAvailable: false }] }))}
+                    >
+                      {t("editor.addSession")}
+                    </Button>
+                  ) : null}
 
                   <p className="font-semibold">{t("editor.groupPrices")}</p>
                   <p className="text-sm">{t("editor.groupPricesHint")}</p>

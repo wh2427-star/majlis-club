@@ -21,7 +21,8 @@ export default async function TrialPage({ params, searchParams }: Props) {
   if (!club || club.status !== "approved") notFound();
   const trialSessions = club.sessions.filter((s) => s.trialAvailable);
   if (trialSessions.length === 0) notFound();
-  if (session && !trialSessions.some((s) => s.id === session)) notFound();
+  // Session ids change when the club saves its schedule; an out-of-date link falls back to the first trial session.
+  const selected = trialSessions.find((s) => s.id === session)?.id ?? trialSessions[0].id;
 
   const [t, contact, kids] = await Promise.all([getTranslations(), getParentContact(), getChildren()]);
   const label = (s: (typeof trialSessions)[number]) => {
@@ -42,7 +43,7 @@ export default async function TrialPage({ params, searchParams }: Props) {
         <TrialForm
           club={{ id: club.id, name: club.name }}
           sessions={trialSessions.map((s) => ({ id: s.id, label: label(s) }))}
-          selected={session ?? trialSessions[0].id}
+          selected={selected}
           contact={{ name: contact?.name ?? "", email: contact?.email ?? "" }}
           kids={kids.map((k) => ({ id: k.id, label: t("enquiry.childLine", { nickname: k.nickname, age: k.age }) }))}
           minDate={isoDay(0)}

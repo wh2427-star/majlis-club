@@ -263,6 +263,25 @@ describe("venues, price plans and trials", () => {
     expect(error).not.toBeNull();
   });
 
+  it("a saved venue sits at its area's centre, whatever coordinates the caller sends", async () => {
+    // The pending club: no browser test depends on its schedule.
+    const { data: club } = await clubOwner.c.from("clubs").select("id").eq("slug", "mirage-martial-arts").single();
+    const { data: area } = await clubOwner.c.from("areas").select("id, lat, lng").eq("slug", "the-springs").single();
+    const { data: sport } = await clubOwner.c.from("sports").select("id").eq("slug", "martial-arts").single();
+    const { error } = await clubOwner.c.rpc("save_club_schedule", {
+      p_club: club!.id,
+      p_payload: {
+        plans: [{ kind: "per_session", priceAed: 70, sessionsCount: null, label: "" }],
+        venues: [{ name: "Far away", areaId: area!.id, lat: 1, lng: 1, groups: [
+          { name: "", ageMin: 6, ageMax: 14, sessions: [{ sportId: sport!.id, day: 2, start: "17:00", end: "18:00", trialAvailable: false }], plans: [] },
+        ] }],
+      },
+    });
+    expect(error).toBeNull();
+    const { data: venue } = await clubOwner.c.from("club_venues").select("lat, lng").eq("club_id", club!.id).single();
+    expect(venue).toEqual({ lat: area!.lat, lng: area!.lng });
+  });
+
   it("a bad plan aborts the whole save", async () => {
     const { clubId } = await oryxSessions(clubOwner.c);
     const count = async (t: string) => (await clubOwner.c.from(t).select("id", { count: "exact", head: true }).eq("club_id", clubId)).count;

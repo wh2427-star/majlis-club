@@ -218,9 +218,15 @@ begin
   end loop;
 
   for v in select * from jsonb_array_elements(coalesce(p_payload -> 'venues', '[]'::jsonb)) loop
+    -- A venue sits at its area's centre; coordinates from the caller are ignored so nobody can rank
+    -- as nearer than they are (fair order). A precise map pin, checked against the area, comes later.
     insert into public.club_venues (club_id, name, area_id, lat, lng, sort)
-    values (p_club, v ->> 'name', (v ->> 'areaId')::uuid, (v ->> 'lat')::double precision, (v ->> 'lng')::double precision, v_sort)
+    select p_club, v ->> 'name', a.id, a.lat, a.lng, v_sort
+    from public.areas a where a.id = (v ->> 'areaId')::uuid
     returning id into v_id;
+    if v_id is null then
+      raise exception 'unknown area' using errcode = '23503';
+    end if;
     v_sort := v_sort + 1;
     g_sort := 0;
     for g in select * from jsonb_array_elements(coalesce(v -> 'groups', '[]'::jsonb)) loop

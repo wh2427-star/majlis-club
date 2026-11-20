@@ -571,6 +571,7 @@
     "child": "Choose a child, or enter a nickname and birth year.",
     "trialSession": "Choose a session.",
     "tooManyPlans": "Up to 8 prices.",
+    "checkSchedule": "Some details need fixing. Check the highlighted fields above.",
     "venueName": "Enter a venue name.",
     "groupName": "Keep the group name under 60 characters.",
     "tooManyVenues": "Up to 5 venues.",

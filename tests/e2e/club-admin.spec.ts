@@ -397,3 +397,13 @@ test("the Pro trials card no longer says approving trials is locked", async ({ p
   await page.goto(await clubBase(page, "Oryx Owls Football"));
   await expect(page.getByTestId("club-pro")).not.toContainText("Approve trial requests");
 });
+
+test("a schedule that cannot be saved says so next to the save button", async ({ page }) => {
+  await newClub(page);
+  await page.getByRole("button", { name: "Add session" }).click();
+  await page.getByRole("button", { name: "Add a price for every venue" }).click();
+  // Price left empty.
+  await page.getByRole("button", { name: "Continue to photos" }).click();
+  await expect(page.getByRole("status").filter({ hasText: "Some details need fixing. Check the highlighted fields above." })).toBeVisible();
+  await expect(page).toHaveURL(/\/edit\/schedule/);
+});

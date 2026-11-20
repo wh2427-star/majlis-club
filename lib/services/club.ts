@@ -138,7 +138,7 @@ export async function updateSchedule(clubId: string, form: FormData): Promise<Ac
   try {
     raw = JSON.parse(String(form.get("schedule") ?? "{}"));
   } catch {
-    return { ok: false, errors: { schedule: "errors.invalid" } };
+    return { ok: false, errors: { schedule: "errors.invalid" }, message: "errors.checkSchedule" };
   }
   const parsed = scheduleSchema.safeParse(raw);
   if (!parsed.success) {
@@ -149,7 +149,8 @@ export async function updateSchedule(clubId: string, form: FormData): Promise<Ac
       if (!errors[key]) errors[key] = msg;
       if (!errors.schedule) errors.schedule = msg;
     }
-    return { ok: false, errors };
+    // Errors sit beside their fields, which may be far up a long form: say so beside the button too.
+    return { ok: false, errors, message: "errors.checkSchedule" };
   }
   const venues = parsed.data.venues
     .map((v) => ({ ...v, groups: v.groups.filter((g) => g.sessions.length || g.plans.length) }))
