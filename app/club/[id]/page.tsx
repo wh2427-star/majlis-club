@@ -2,7 +2,8 @@ import Link from "next/link";
 import { getFormatter, getTranslations } from "next-intl/server";
 import { getClubPhotos } from "@/lib/data/queries";
 import { getDashboard, getLicenceStatus, requireClubAccess } from "@/lib/services/club";
-import { setEnquiryStatusAction } from "@/app/actions/club";
+import { setEnquiryStatusAction, setTrialStatusAction } from "@/app/actions/club";
+import { formatTime12 } from "@/lib/domain/facts";
 import { profileChecklist } from "@/lib/domain/dashboard";
 import { Badge } from "@/components/ui/Badge";
 import { Button, ButtonLink } from "@/components/ui/Button";
@@ -19,6 +20,7 @@ import { ProTools } from "@/components/club/ProTools";
 export const metadata = { title: "Club dashboard" };
 
 const statusIcon: Record<string, IconName> = { sent: "clock", seen: "check", replied: "check", closed: "x" };
+const trialIcon: Record<string, IconName> = { requested: "clock", accepted: "check", declined: "x" };
 
 /** The club owner's home: real numbers first, then what to do about them. Small numbers, including zero, shown honestly. */
 export default async function ClubDashboardPage({ params }: { params: Promise<{ id: string }> }) {
@@ -67,13 +69,14 @@ export default async function ClubDashboardPage({ params }: { params: Promise<{ 
         </ul>
       </nav>
 
-      <section aria-label={t("dashboard.statsLabel")} className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+      <section aria-label={t("dashboard.statsLabel")} className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard
           testId="stat-views" label={t("dashboard.views")} value={d.viewsTotal}
           note={trendNote}
         />
         <StatCard testId="stat-saves" label={t("dashboard.saves")} value={d.saves} note={t("dashboard.savesNote")} />
         <StatCard testId="stat-enquiries" label={t("dashboard.enquiries")} value={d.enquiriesTotal} note={t("dashboard.enquiriesNote")} />
+        <StatCard testId="stat-trials" label={t("dashboard.trials")} value={d.trials42} note={t("dashboard.trialsNote")} />
       </section>
 
       <ViewsChart weeks={d.weeks} note={t("dashboard.chartNote", { count: d.enquiriesTotal })} />
@@ -122,6 +125,44 @@ export default async function ClubDashboardPage({ params }: { params: Promise<{ 
                     </form>
                   ))}
               </div>
+            </li>
+          ))}
+        </ul>
+      </Section>
+
+      <Section title={t("dashboard.trialsTitle")} id="trials">
+        {d.trialList.length === 0 ? <p>{t("dashboard.noTrials")}</p> : null}
+        <ul className="flex flex-col gap-3">
+          {d.trialList.map((r) => (
+            <li key={r.id} className="rounded-card bg-white p-4">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <span className="font-semibold">{t("demand.childLine", { nickname: r.child_nickname, year: r.child_birth_year })}</span>
+                <Badge kind="status" icon={trialIcon[r.status]}>{t(`family.trialStatus.${r.status}`)}</Badge>
+              </div>
+              <p>
+                {t("dashboard.trialSession", {
+                  sport: r.sports ? t(`sports.${r.sports.slug}`) : "",
+                  day: t(`days.long.${r.session_day}`),
+                  time: formatTime12(r.session_start),
+                  venue: r.venue_name,
+                })}
+              </p>
+              <p>{t("dashboard.trialDate", { date: format.dateTime(new Date(`${r.preferred_date}T12:00:00`), { weekday: "short", day: "numeric", month: "short" }) })}</p>
+              <p className="break-words text-sm">{r.contact_name} · {r.contact_email}</p>
+              {r.status === "requested" ? (
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {(["accepted", "declined"] as const).map((s) => (
+                    <form key={s} action={setTrialStatusAction}>
+                      <input type="hidden" name="clubId" value={club.id} />
+                      <input type="hidden" name="trialId" value={r.id} />
+                      <input type="hidden" name="status" value={s} />
+                      <Button type="submit" variant={s === "accepted" ? "primary" : "secondary"}>
+                        {t(s === "accepted" ? "dashboard.acceptTrial" : "dashboard.declineTrial")}
+                      </Button>
+                    </form>
+                  ))}
+                </div>
+              ) : null}
             </li>
           ))}
         </ul>

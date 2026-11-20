@@ -60,7 +60,17 @@
     }
   },
   "trial": {
-    "book": "Book a free trial"
+    "book": "Book a free trial",
+    "title": "Book a free trial at {club}",
+    "intro": "No payment. The club will accept, or reply to suggest another time.",
+    "session": "Session",
+    "sessionLine": "{group} at {venue} · {day}, {start} to {end}",
+    "child": "Child",
+    "date": "Preferred date",
+    "dateHint": "Any day in the next 60 days. The club confirms the date.",
+    "consent": "I agree that {club} will see your name, email and your child's nickname and birth year.",
+    "submit": "Ask for a free trial",
+    "alreadyRequested": "You already asked for a trial of this session."
   },
   "clubType": {
     "academy": "Academy",
@@ -227,6 +237,14 @@
       "seen": "Seen by the club",
       "replied": "The club replied",
       "closed": "Closed"
+    },
+    "trialsTitle": "Trial requests",
+    "noTrials": "No trial requests yet. Clubs that offer a free trial show a button next to the session.",
+    "trialLine": "{sport} trial at {club}, {date}",
+    "trialStatus": {
+      "requested": "Requested",
+      "accepted": "Accepted",
+      "declined": "Declined"
     }
   },
   "auth": {
@@ -259,6 +277,14 @@
     "openClub": "Open club"
   },
   "dashboard": {
+    "trials": "Trial requests",
+    "trialsNote": "Last 6 weeks",
+    "trialsTitle": "Trial requests",
+    "noTrials": "No trial requests yet. Tick 'Offer a free trial session' on a session in Schedule & fee.",
+    "trialSession": "{sport}, {day} {time}, {venue}",
+    "trialDate": "Preferred date: {date}",
+    "acceptTrial": "Accept",
+    "declineTrial": "Decline",
     "title": "Club dashboard",
     "intro": "Visibility is free for every club. Manage incoming parent demand for {name}.",
     "live": "Free listing live",
@@ -288,7 +314,7 @@
     "comingSoon": "Coming soon",
     "tools": {
       "inbox": { "title": "Enquiry inbox", "body": "Centralise parent questions from your profile in one reply thread." },
-      "trials": { "title": "Trial and waitlist manager", "body": "Approve trial requests, cap class sizes, and auto-fill cancellations." },
+      "trials": { "title": "Trial and waitlist manager", "body": "Waitlists, class caps and automatic cancellation fills." },
       "registration": { "title": "Term registration and attendance", "body": "Track renewals and mark poolside or pitchside attendance on mobile." },
       "payments": { "title": "Payments and term billing", "body": "Collect monthly or termly AED fees with automatic receipts." },
       "messaging": { "title": "Parent messaging", "body": "Send weather updates, pitch changes, and term reminders." },

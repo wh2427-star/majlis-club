@@ -240,6 +240,12 @@ export type EnquiryRow = {
   child_birth_year: number | null; message: string; status: "sent" | "seen" | "replied" | "closed"; created_at: string;
 };
 
+export type TrialRow = {
+  id: string; child_nickname: string; child_birth_year: number; contact_name: string; contact_email: string;
+  venue_name: string; session_day: number; session_start: string; preferred_date: string;
+  status: "requested" | "accepted" | "declined"; created_at: string; sports: { slug: string } | null;
+};
+
 /** Club dashboard: six weeks of real counts, honest even when small. Upgrade prompt only when 30-day enquiries cross the threshold. */
 export async function getDashboard(clubId: string) {
   const db = await createClient();
@@ -250,7 +256,7 @@ export async function getDashboard(clubId: string) {
     const { count } = await db.from("club_events").select("id", { count: "exact", head: true }).eq("club_id", clubId).eq("kind", "enquiry").gte("created_at", from);
     return count ?? 0;
   };
-  const [weekly, saves, enquiriesTotal, enquiries30, list] = await Promise.all([
+  const [weekly, saves, enquiriesTotal, enquiries30, list, trials42, trials] = await Promise.all([
     // Counted in SQL: reading rows would be capped by the API's max rows and undercount busy clubs.
     db.rpc("club_weekly_views", { p_club: clubId }),
     db.rpc("club_save_count", { p_club: clubId }),
@@ -262,7 +268,18 @@ export async function getDashboard(clubId: string) {
       .eq("club_id", clubId)
       .order("created_at", { ascending: false })
       .limit(50),
+    db.from("trial_requests").select("id", { count: "exact", head: true }).eq("club_id", clubId).gte("created_at", d42),
+    db
+      .from("trial_requests")
+      .select("id, child_nickname, child_birth_year, contact_name, contact_email, venue_name, session_day, session_start, preferred_date, status, created_at, sports(slug)")
+      .eq("club_id", clubId)
+      .order("created_at", { ascending: false })
+      .limit(50),
   ]);
+  // Waiting requests first, then the newest.
+  const trialList = ((trials.data ?? []) as unknown as TrialRow[]).sort(
+    (a, b) => Number(b.status === "requested") - Number(a.status === "requested") || b.created_at.localeCompare(a.created_at),
+  );
   const weeks = (weekly.data as number[] | null) ?? [0, 0, 0, 0, 0, 0];
   return {
     weeks,
@@ -273,7 +290,16 @@ export async function getDashboard(clubId: string) {
     enquiries30,
     showUpgrade: shouldShowUpgradePrompt(enquiries30, appConfig.upgradeEnquiryThreshold),
     list: (list.data ?? []) as EnquiryRow[],
+    trials42: trials42.count ?? 0,
+    trialList,
   };
+}
+
+/** The club accepts or declines a waiting trial request; the database refuses any other change. */
+export async function setTrialStatus(clubId: string, id: string, status: "accepted" | "declined") {
+  await requireClubAccess(clubId, `/club/${clubId}`);
+  const db = await createClient();
+  await db.from("trial_requests").update({ status }).eq("id", id).eq("club_id", clubId).eq("status", "requested");
 }
 
 export async function setEnquiryStatus(clubId: string, enquiryId: string, status: "seen" | "replied" | "closed") {

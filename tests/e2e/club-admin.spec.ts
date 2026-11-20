@@ -350,3 +350,50 @@ test("saving the schedule keeps venues where they were", async ({ page }) => {
   await expect(card.locator("[data-fact=area] dd")).toHaveText("The Springs");
   await expect(card.locator("[data-fact=price] dd")).toHaveText("from AED 75 a session");
 });
+
+test("dashboard counts trial requests and lists them, with accept and decline only while waiting", async ({ page }) => {
+  await signIn(page, "club");
+  await page.goto(await clubBase(page, "Oryx Owls Football"));
+  await expect(page.getByTestId("stat-trials").getByTestId("stat-value")).toHaveText(/^[3-9]|\d\d+$/);
+  const trials = page.getByRole("region", { name: "Trial requests" });
+  // Kit's request (a seeded parent) stays waiting; another test accepts Bean's.
+  const waiting = trials.getByRole("listitem").filter({ hasText: "Kit" });
+  await expect(waiting).toContainText("Ranches Community Pitch");
+  await expect(waiting.getByRole("button", { name: "Accept" })).toBeVisible();
+  await expect(waiting.getByRole("button", { name: "Decline" })).toBeVisible();
+  const accepted = trials.getByRole("listitem").filter({ hasText: "Rae" });
+  await expect(accepted).toContainText("Accepted");
+  await expect(accepted.getByRole("button")).toHaveCount(0);
+});
+
+test("club accepts a trial request and the parent sees it accepted", async ({ page }) => {
+  await signIn(page, "club");
+  await page.goto(await clubBase(page, "Oryx Owls Football"));
+  const bean = page.getByRole("region", { name: "Trial requests" }).getByRole("listitem").filter({ hasText: "Bean" });
+  await bean.getByRole("button", { name: "Accept" }).click();
+  await expect(bean).toContainText("Accepted");
+  await expect(bean.getByRole("button")).toHaveCount(0);
+  await page.context().clearCookies();
+  await signIn(page, "parent");
+  await page.goto("/family");
+  await expect(page.getByRole("region", { name: "Trial requests" })).toContainText("Accepted");
+});
+
+test("trial requests survive a schedule save", async ({ page }) => {
+  await signIn(page, "club");
+  const base = await clubBase(page, "Oryx Owls Football");
+  await page.goto(base);
+  const before = await page.getByRole("region", { name: "Trial requests" }).getByRole("listitem").count();
+  await page.goto(`${base}/edit/schedule`);
+  await page.getByRole("button", { name: "Continue to photos" }).click();
+  await page.waitForURL(/\/photos$/);
+  await page.goto(base);
+  await expect(page.getByRole("region", { name: "Trial requests" }).getByRole("listitem")).toHaveCount(before);
+  await expect(page.getByRole("region", { name: "Trial requests" })).toContainText("Ranches Community Pitch");
+});
+
+test("the Pro trials card no longer says approving trials is locked", async ({ page }) => {
+  await signIn(page, "club");
+  await page.goto(await clubBase(page, "Oryx Owls Football"));
+  await expect(page.getByTestId("club-pro")).not.toContainText("Approve trial requests");
+});

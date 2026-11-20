@@ -16,7 +16,7 @@ const publicPages = [
 ];
 
 const signedInPages: [Role, string[]][] = [
-  ["parent", ["/family", "/enquire/ghaf-tree-swim-squad"]],
+  ["parent", ["/family", "/enquire/ghaf-tree-swim-squad", "/trial/oryx-owls-football"]],
   // "/club" redirects club owners to their dashboard, which the club management test covers.
   ["club", ["/club/new", "/club/upgrade"]],
   ["admin", ["/admin/licences", "/admin/photos", "/admin/approvals", "/admin/coverage"]],
